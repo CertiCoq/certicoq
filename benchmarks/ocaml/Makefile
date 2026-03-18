@@ -1,4 +1,4 @@
-COQOPTS = -R ../lib CertiCoq.Benchmarks.lib
+COQOPTS = -R ../lib CertiRocq.Benchmarks.lib
 CCOMPILER=gcc
 
 # Names of the benchmarks

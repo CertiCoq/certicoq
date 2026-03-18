@@ -1,22 +1,22 @@
-From Coq Require Import NArith.BinNat Arith Relations.Relations MSets.MSets MSets.MSetRBT
+From Stdlib Require Import NArith.BinNat Arith Relations.Relations MSets.MSets MSets.MSetRBT
      Lists.List micromega.Lia Sets.Ensembles.
 
 Require Import LambdaANF.cps LambdaANF.eval LambdaANF.Ensembles_util LambdaANF.List_util LambdaANF.tactics LambdaANF.set_util LambdaANF.ctx
         LambdaANF.logical_relations LambdaANF.logical_relations_cc LambdaANF.algebra LambdaANF.inline_letapp LambdaANF.lambda_lifting_correct.
 Require Import LambdaANF.closure_conversion_correct ctx.
 
-Require Import micromega.Lia.
+From Stdlib Require Import micromega.Lia.
 
 Import ListNotations.
 
-Open Scope alg_scope. 
+Open Scope alg_scope.
 
 
 Section Bounds.
-  
+
 
   (* ***** Fuel ***** *)
-  
+
   Global Program Instance fuel_res_pre : @resource fin nat :=
     { zero := 0;
       one_i fin := 1;
@@ -31,15 +31,15 @@ Section Bounds.
   Next Obligation.
     destruct (Compare_dec.lt_dec x y); auto. right. eexists (x - y). lia.
   Qed.
-  
-  Global Program Instance fuel_res_ones : @resource_ones fin nat fuel_res_pre. 
+
+  Global Program Instance fuel_res_ones : @resource_ones fin nat fuel_res_pre.
 
   Global Program Instance fuel_res_hom : @nat_hom fin nat fuel_res_pre :=
     { to_nat y := y }.
 
   Global Program Instance fuel_res_exp : @exp_resource nat :=
     { HRes := fuel_res_pre }.
-  
+
   Global Instance fuel_res : @fuel_resource nat.
   Proof.
     econstructor.
@@ -51,7 +51,7 @@ Section Bounds.
 
   (* ***** Trace ***** *)
 
-  
+
   Global Program Instance trace_res_pre : @resource fin (nat * nat) :=
     { zero := (0, 0);
       one_i fin :=
@@ -65,11 +65,11 @@ Section Bounds.
   Solve Obligations with (try (split; congruence)).
   Next Obligation. simpl. f_equal; lia. Qed.
   Next Obligation. simpl. f_equal; lia. Qed.
-  Next Obligation. simpl. f_equal; lia. Qed.  
+  Next Obligation. simpl. f_equal; lia. Qed.
 
   Global Program Instance trace_res_exp : @exp_resource (nat * nat) :=
     { HRes := trace_res_pre }.
-  
+
   Global Instance trace_res : @trace_resource (nat * nat).
   Proof.
     econstructor. eapply trace_res_exp.
@@ -85,43 +85,43 @@ Section Bounds.
     try unfold HRexp_t in *; try unfold trace_res in *; try unfold trace_res_exp in *; try unfold trace_res_pre in *.
 
 
-  Section Inline_bound. 
+  Section Inline_bound.
 
     (* bound for inlining *)
-    Definition inline_bound (L G : nat) : PostT := 
+    Definition inline_bound (L G : nat) : PostT :=
       fun '(e1, rho1, c1, (t1, tapp1)) '(e2, rho2, c2, (t2, tapp2)) =>
         c1 <= c2 + 2 * G * tapp1 + 2 * L /\
         tapp1 <= tapp2 + 2 * G * tapp2 + L /\
-        t2 + tapp2 = c2. 
+        t2 + tapp2 = c2.
 
     Context (cenv : ctor_env).
 
     Instance inline_bound_compat L G (Hi : L <= G) :
-      Post_properties cenv (inline_bound L G) (inline_bound L G) (inline_bound G G). 
+      Post_properties cenv (inline_bound L G) (inline_bound L G) (inline_bound G G).
     Proof.
       constructor; (try (intro; intros; intro; intros; destruct cout1; destruct cout2;
                          unfold inline_bound in *; unfold_all; simpl; split; [| split ]; lia)).
       - intro; intros. intro; intros. destruct cout1; destruct cout2. destruct cout1'; destruct cout2'.
         unfold inline_bound in *; unfold_all; simpl. destructAll. split. lia. split; lia.
 
-      - intro; intros. intro; intros. 
+      - intro; intros. intro; intros.
         unfold inline_bound in *; unfold_all; simpl.
         assert (c = 0). eapply Nat.lt_1_r. eassumption. subst. lia.
-      - intro; intros. unfold post_base'. 
+      - intro; intros. unfold post_base'.
         unfold inline_bound in *; unfold_all; simpl. lia.
       - intro; intros; unfold inline_bound in *.
         destruct x as [[[? ?] ?] [? ?]]; destruct y as [[[? ?] ?] [? ?]]. split; [| split ]; lia.
-    Qed. 
-    
+    Qed.
+
     Lemma inline_bound_post_Eapp_l i G v t l rho1 x rho2 :
       post_Eapp_l (inline_bound i G) (inline_bound (S i) G) v t l rho1 x rho2.
     Proof.
       intro; intros. unfold inline_bound in *. unfold_all. simpl in *.
-      destruct cout1; destruct cout2. simpl in *. destructAll. 
+      destruct cout1; destruct cout2. simpl in *. destructAll.
       split; [| split ]; try lia.
     Qed.
 
-    Lemma inline_bound_remove_steps_letapp_OOT i j G : 
+    Lemma inline_bound_remove_steps_letapp_OOT i j G :
       remove_steps_letapp_OOT cenv (inline_bound j G) (inline_bound (S (i + j)) G).
     Proof.
       intro; intros. unfold inline_bound in *. unfold_all. simpl in *.
@@ -129,33 +129,33 @@ Section Bounds.
       split; [| split ]; lia.
     Qed.
 
-    Lemma inline_bound_remove_steps_letapp i j G : 
+    Lemma inline_bound_remove_steps_letapp i j G :
       remove_steps_letapp cenv (inline_bound i G) (inline_bound j G) (inline_bound (S (i + j)) G).
     Proof.
       intro; intros. unfold inline_bound in *. unfold_all; simpl in *.
-      destruct cout1; destruct cout2. destruct cout1'; destruct cout2'. simpl in *. lia. 
-    Qed.    
+      destruct cout1; destruct cout2. destruct cout1'; destruct cout2'. simpl in *. lia.
+    Qed.
 
 
-    (* This allows us to prove divergence preservation *)  
+    (* This allows us to prove divergence preservation *)
     Lemma inline_bound_post_upper_bound L G :
       post_upper_bound (inline_bound L G).
     Proof.
       intro; intros. unfold inline_bound in *. unfold_all.
       eexists (fun x => (1 + 2 * G + 2 * G * 2 * G) * x + 2 * L * 2 * G + 2 * L).
-      intros. 
+      intros.
       destruct cout1 as [t1 tapp1]; destruct cout2 as [t2 tapp2].
 
       destruct H. destruct H0.
       assert (Hleq : tapp1 <= cin2 + 2 * G * cin2 + L) by lia. clear H0 H1.
-      
+
       assert (Hleq' : (1 + 2 * G + 2 * G * 2 * G) * cin1 + 2 * L * 2 * G + 2 * L <=
                       (1 + 2 * G + 2 * G * 2 * G) * cin2 + 2 * L * 2 * G + 2 * L).
       { eapply Nat.le_trans. eassumption. eapply Nat.le_trans.
-        apply -> Nat.add_le_mono_r. apply -> Nat.add_le_mono_l. 
+        apply -> Nat.add_le_mono_r. apply -> Nat.add_le_mono_l.
         eapply Nat.mul_le_mono_l. eassumption.
-        lia. } 
-      
+        lia. }
+
       assert (Hleq'' : cin1 <= cin2).
       { eapply Nat.add_le_mono_r in Hleq'. eapply Nat.add_le_mono_r in Hleq'.
         eapply Nat.mul_le_mono_pos_l in Hleq'. eassumption. lia. }
@@ -164,7 +164,7 @@ Section Bounds.
     Qed.
 
     (* bound for inlining, toplevel *)
-    Definition inline_bound_top (G : nat) : @PostT nat (nat * nat) := 
+    Definition inline_bound_top (G : nat) : @PostT nat (nat * nat) :=
       fun '(e1, rho1, c1, (t1, tapp1)) '(e2, rho2, c2, (t2, tapp2)) =>
         let A := 1 + 2 * G + 2 * G * 2 * G in
         c1 <= A * c2 + A.
@@ -176,15 +176,15 @@ Section Bounds.
       intros. destructAll.
       eapply Nat.le_trans. eassumption.
       eapply Nat.le_trans. apply -> Nat.add_le_mono_r.
-      apply -> Nat.add_le_mono_l. 
+      apply -> Nat.add_le_mono_l.
       eapply Nat.mul_le_mono_l. eassumption.
       lia.
     Qed.
 
     (* For shrink reduction *)
     Open Scope ctx_scope.
-    
-    Lemma inline_bound_ctx1 :      
+
+    Lemma inline_bound_ctx1 :
       forall (C : exp_ctx) (e1 : exp) (rho1 rho1' : env) (e2 : exp) (rho2 : env) (cin1 cin2 : nat)
              (cout1 cout2 : nat * nat),
         ctx_to_rho C rho1 rho1' ->
@@ -196,7 +196,7 @@ Section Bounds.
       intro; intros. unfold inline_bound in *. unfold_all; simpl in *.
       destruct cout1; destruct cout2. simpl in *. destructAll.
       destruct (C |[ e1 ]|); simpl; try lia.
-    Qed.    
+    Qed.
 
 
     Lemma inline_bound_Ecase :
@@ -204,18 +204,18 @@ Section Bounds.
         cps_util.find_tag_nth cl t e n ->
         inline_bound 0 1 (e, rho1, cin1, cout1) (e, rho2, cin2, cout2) ->
         inline_bound 1 1 (Ecase x cl, rho1, cin1 <+> one (Ecase x cl), cout1 <+> one (Ecase x cl)) (e, rho2, cin2, cout2).
-    Proof. 
+    Proof.
       intro; intros. unfold inline_bound in *. unfold_all; simpl in *.
       destruct cout1; destruct cout2. simpl in *. destructAll. lia.
-    Qed.    
+    Qed.
 
-  
+
   End Inline_bound.
-  
+
   Section SimpleBound.
 
     Context (cenv : ctor_env).
-    
+
     (* Simple bound for transformations that don't decrease steps *)
     Definition simple_bound (L : nat) : @PostT nat (nat * nat) :=
       fun '(e1, rho1, c1, (t1, tapp1)) '(e2, rho2, c2, (t2, tapp2)) =>
@@ -223,20 +223,20 @@ Section Bounds.
 
 
     Instance simple_bound_compat k :
-      Post_properties cenv (simple_bound 0) (simple_bound k) (simple_bound 0). 
+      Post_properties cenv (simple_bound 0) (simple_bound k) (simple_bound 0).
     Proof.
       constructor; (try (intro; intros; intro; intros; destruct cout1; destruct cout2;
                          unfold simple_bound  in *; unfold_all; simpl; lia)).
       - intro; intros. intro; intros. destruct cout1; destruct cout2. destruct cout1'; destruct cout2'.
         unfold simple_bound in *; unfold_all; simpl. destructAll. lia.
-      - intro; intros. intro; intros. 
+      - intro; intros. intro; intros.
         unfold simple_bound in *; unfold_all; simpl. lia.
-      - intro; intros. unfold post_base'. 
+      - intro; intros. unfold post_base'.
         unfold simple_bound in *; unfold_all; simpl. lia.
       - intro; intros; unfold simple_bound in *.
         destruct x as [[[? ?] ?] [? ?]]; destruct y as [[[? ?] ?] [? ?]]. lia.
-    Qed. 
-    
+    Qed.
+
 
     (* CC bound properties *)
 
@@ -253,8 +253,8 @@ Section Bounds.
       intros. destruct cout1; destruct cout2. unfold simple_bound in *. unfold_all. simpl in *.
       lia.
     Qed.
-    
-      
+
+
     Lemma Hpost_locals_l :
       forall (n : nat) (rho1 rho2  rho2' : env)(e1 : exp) (e2 : exp)
              (cin1 : nat) (cout1 : nat * nat)
@@ -268,7 +268,7 @@ Section Bounds.
       intros. destruct cout1; destruct cout2. unfold simple_bound in *. unfold_all. simpl in *.
       lia.
     Qed.
-    
+
     Lemma Hpost_locals_l0 :
       forall (n : nat) (rho1 rho2  rho2' : env)(e1 : exp) (e2 : exp)
              (cin1 : nat) (cout1 : nat * nat)
@@ -300,24 +300,24 @@ Section Bounds.
     Context (clo_tag : ctor_tag).
 
     Lemma HPost_letapp_cc :
-      forall f x t xs e1 rho1 n k, 
+      forall f x t xs e1 rho1 n k,
         k <= 4 + 4 * length xs  ->
         post_letapp_compat_cc' cenv clo_tag f x t xs e1 rho1 (simple_bound n) (simple_bound (n + k)) (simple_bound 0).
     Proof.
       intro; intros. intro; intros. destruct cout1; destruct cout2. destruct cout1'; destruct cout2'.
       unfold simple_bound in *; unfold_all; simpl. destructAll. lia.
     Qed.
-    
-    
+
+
     Lemma HPost_letapp_OOT_cc :
-      forall f x t xs e1 rho1 n k, 
+      forall f x t xs e1 rho1 n k,
         k <= 4 + 4 * length xs ->
         post_letapp_compat_cc_OOT' clo_tag f x t xs e1 rho1 (simple_bound (n + k)) (simple_bound 0).
     Proof.
       intro; intros. intro; intros. destruct cout1; destruct cout2.
       unfold simple_bound in *; unfold_all; simpl. destructAll. lia.
     Qed.
-    
+
 
     Lemma HPost_app :
       forall k v t l rho1,
@@ -328,13 +328,13 @@ Section Bounds.
     Qed.
 
 
-    (* This allows us to prove divergence preservation *)  
+    (* This allows us to prove divergence preservation *)
     Lemma simple_bound_post_upper_bound L :
       post_upper_bound (simple_bound L).
     Proof.
       intro; intros. unfold simple_bound in *. unfold_all.
       eexists (fun x => x +  L).
-      intros. 
+      intros.
       destruct cout1 as [t1 tapp1]; destruct cout2 as [t2 tapp2].
       eapply Nat.add_le_mono_r in H.
 
@@ -345,12 +345,12 @@ Section Bounds.
 
   Section HoistingBound.
 
-    Context (cenv : ctor_env). 
+    Context (cenv : ctor_env).
 
-    Definition hoisting_bound (L G : nat) : @PostT nat (nat * nat) := 
+    Definition hoisting_bound (L G : nat) : @PostT nat (nat * nat) :=
       fun '(e1, rho1, c1, (t1, tapp1)) '(e2, rho2, c2, (t2, tapp2)) =>
         c1 <= c2 + G * c2 + L.
-    
+
     Instance hoisting_bound_compat L G (Hi : L <= G) :
       Post_properties cenv (hoisting_bound L G) (hoisting_bound L G) (hoisting_bound G G).
     Proof.
@@ -358,13 +358,13 @@ Section Bounds.
                          unfold hoisting_bound in *; unfold_all; simpl; lia)).
       - intro; intros. intro; intros. destruct cout1; destruct cout2. destruct cout1'; destruct cout2'.
         unfold hoisting_bound in *; unfold_all; simpl. destructAll. lia.
-      - intro; intros. intro; intros. 
-        unfold hoisting_bound in *; unfold_all; simpl. lia. 
-      - intro; intros. unfold post_base'. 
+      - intro; intros. intro; intros.
+        unfold hoisting_bound in *; unfold_all; simpl. lia.
+      - intro; intros. unfold post_base'.
         unfold hoisting_bound in *; unfold_all; simpl. lia.
       - intro; intros; unfold hoisting_bound in *.
         destruct x as [[[? ?] ?] [? ?]]; destruct y as [[[? ?] ?] [? ?]]. lia.
-    Qed. 
+    Qed.
 
     Lemma hoisting_bound_mon n m G :
       n <= m -> inclusion _ (hoisting_bound n G) (hoisting_bound m G).
@@ -372,9 +372,9 @@ Section Bounds.
       intros Hleq.
       intro; intros; unfold hoisting_bound in *.
       destruct x as [[[? ?] ?] [? ?]]; destruct y as [[[? ?] ?] [? ?]]. lia.
-    Qed. 
+    Qed.
 
-    
+
     Lemma hoisting_bound_post_Efun_l n G :
       post_Efun_l (hoisting_bound n G) (hoisting_bound (S n) G).
     Proof.
@@ -385,21 +385,21 @@ Section Bounds.
     Lemma hoisting_bound_post_Efun_r n m :
       (n <= m)%nat -> post_Efun_r (hoisting_bound n m) (hoisting_bound m m).
     Proof.
-      intros Hleq. 
-      intro; intros. unfold hoisting_bound in *. unfold_all. simpl in *.      
+      intros Hleq.
+      intro; intros. unfold hoisting_bound in *. unfold_all. simpl in *.
       destruct cout1; destruct cout2. lia.
     Qed.
-    
+
     Lemma hoisting_bound_post_upper_bound n G :
       post_upper_bound (hoisting_bound n G).
     Proof.
       intro; intros. unfold hoisting_bound in *. unfold_all.
       eexists (fun x => G * x + x + n).
-      intros. 
+      intros.
       destruct cout1 as [t1 tapp1]; destruct cout2 as [t2 tapp2].
       eapply Nat.add_le_mono_r in H.
       replace (cin2 + G * cin2) with ((1 + G) * cin2) in H by lia.
-      replace (G * cin1 + cin1) with ((1 + G) * cin1) in H by lia.      
+      replace (G * cin1 + cin1) with ((1 + G) * cin1) in H by lia.
       eapply Nat.mul_le_mono_pos_l in H.
       eexists (cin2 - cin1). simpl. lia.
       lia.
@@ -414,11 +414,11 @@ Section Bounds.
     Context (cenv : ctor_env).
 
     Instance ll_bound_compat k m n :
-      Post_properties cenv (ll_bound k) (ll_bound m) (ll_bound n). 
+      Post_properties cenv (ll_bound k) (ll_bound m) (ll_bound n).
     Proof. unfold ll_bound in *. eapply simple_bound_compat. Qed.
-    
-    Lemma ll_bound_local_steps : 
-      forall {A} e1 rho1 c1 t1 e2 rho2 c2 t2 fvs f B1 rhoc x t xs1 l, 
+
+    Lemma ll_bound_local_steps :
+      forall {A} e1 rho1 c1 t1 e2 rho2 c2 t2 fvs f B1 rhoc x t xs1 l,
         M.get f rho1 = Some (Vfun rhoc B1 x) ->
         find_def x B1 = Some (t, xs1, e1) ->
         ll_bound l (e1, rho1, c1, t1) (e2, rho2, c2, t2) ->
@@ -427,32 +427,32 @@ Section Bounds.
     Proof.
       intros. destruct t1, t2.
       unfold simple_bound  in *; unfold_all; simpl in *. lia.
-    Qed. 
+    Qed.
 
     Lemma ll_bound_mon :
       forall l l', l <= l' -> inclusion _ (ll_bound l) (ll_bound l').
     Proof.
       intros. intro; intros. eassumption.
     Qed.
-      
-   Lemma ll_bound_local_app : 
+
+   Lemma ll_bound_local_app :
      forall (e1 : exp) (rho1 : env) (f : var) (ft : fun_tag) (ys : list var) (rho2 : env),
        post_Eapp_r (ll_bound 0) (ll_bound (1 + Datatypes.length ys)) e1 rho1 f ft ys rho2.
    Proof.
      intros. intro; intros. destruct cout1, cout2.
      unfold simple_bound  in *; unfold_all; simpl in *. lia.
-   Qed. 
+   Qed.
 
-     
-   Lemma ll_bound_local_app' : 
+
+   Lemma ll_bound_local_app' :
      forall (e1 : exp) (rho1 : env) (f : var) (ft : fun_tag) (ys : list var) (rho2 : env),
        post_Eapp_r (ll_bound 1) (ll_bound (1 + Datatypes.length ys + 1)) e1 rho1 f ft ys rho2.
    Proof.
      intros. intro; intros. destruct cout1, cout2.
      unfold simple_bound  in *; unfold_all; simpl in *. lia.
-   Qed. 
+   Qed.
 
-     
+
    Lemma ll_bound_local_steps_let_app :
       forall e1 rho1 c1 t1 c1' t1' e2 rho2 e2' rho2' e2'' rho2'' c2  t2 c2' t2'
              f B1 e1' rhoc rhoc' x ft ys ys' xs1 vs1 v fvs ft' f',
@@ -468,10 +468,10 @@ Section Bounds.
    Proof.
      intros. destruct t1, t2, t1', t2'.
      unfold simple_bound  in *; unfold_all; simpl in *. lia.
-   Qed. 
+   Qed.
 
    Lemma ll_bound_local_steps_let_app_OOT :
-     forall e1 rho1 c1 t1  e2 rho2 e2' rho2' e2'' c2  t2 
+     forall e1 rho1 c1 t1  e2 rho2 e2' rho2' e2'' c2  t2
             f B1 e1' rhoc rhoc' x ft ys ys' xs1 vs1 fvs ft' f' f'',
        M.get f rho1 = Some (Vfun rhoc B1 f'') ->
        find_def f'' B1 = Some (ft, xs1, e1') ->
@@ -484,13 +484,13 @@ Section Bounds.
    Proof.
      intros. destruct t1, t2.
      unfold simple_bound  in *; unfold_all; simpl in *. lia.
-   Qed. 
+   Qed.
 
 
-   
-   Lemma ll_bound_local_steps_app : 
-     forall rho1 c1 t1 e2 rho2 e2' rho2' c2 t2 
-            f B1 e1' rhoc rhoc' f' ft ys xs1 vs1 f'' ft' ys' fvs, 
+
+   Lemma ll_bound_local_steps_app :
+     forall rho1 c1 t1 e2 rho2 e2' rho2' c2 t2
+            f B1 e1' rhoc rhoc' f' ft ys xs1 vs1 f'' ft' ys' fvs,
        M.get f rho1 = Some (Vfun rhoc B1 f') ->
        find_def f' B1 = Some (ft, xs1, e1') ->
        set_lists xs1 vs1 (def_funs B1 B1 rhoc rhoc) = Some rhoc' ->
@@ -501,11 +501,11 @@ Section Bounds.
    Proof.
      intros. destruct t1, t2.
      unfold simple_bound  in *; unfold_all; simpl in *. lia.
-   Qed. 
+   Qed.
 
-   
+
    Lemma ll_bound_ctx_r :
-     forall (n : nat) (e1 e2 : exp) (C : exp_ctx) (rho1 rho2 rho2' : env) 
+     forall (n : nat) (e1 e2 : exp) (C : exp_ctx) (rho1 rho2 rho2' : env)
             (C0 : exp_ctx) c1 c2 cout1 cout2,
        ctx_to_rho C rho2 rho2' ->
        ll_bound n (e1, rho1, c1, cout1) (e2, rho2', c2, cout2) ->
@@ -514,7 +514,7 @@ Section Bounds.
    Proof.
      intros. destruct cout1, cout2.
      unfold simple_bound  in *; unfold_all; simpl in *. lia.
-   Qed. 
+   Qed.
 
   End LambdaLiftingBound.
 
@@ -523,10 +523,10 @@ Section Bounds.
 
 
     Lemma Hpost_curry :
-      forall e rho rho' rho'' c1 c2 cout1 cout2 f1 ft1 fv1 gv1, 
+      forall e rho rho' rho'' c1 c2 cout1 cout2 f1 ft1 fv1 gv1,
         simple_bound 0 (e, rho, c1, cout1) (e, rho'', c2, cout2) ->
-        simple_bound 0 (e, rho, c1, cout1) (Eapp f1 ft1 (gv1 ++ fv1), rho', plus c2 (one (Eapp f1 ft1 (gv1 ++ fv1))), plus cout2 (one (Eapp f1 ft1 (gv1 ++ fv1)))). 
-    Proof. 
+        simple_bound 0 (e, rho, c1, cout1) (Eapp f1 ft1 (gv1 ++ fv1), rho', plus c2 (one (Eapp f1 ft1 (gv1 ++ fv1))), plus cout2 (one (Eapp f1 ft1 (gv1 ++ fv1)))).
+    Proof.
       intros. destruct cout1; destruct cout2. unfold simple_bound in *. unfold_all. simpl in *.
       lia.
     Qed.
@@ -539,6 +539,5 @@ Section Bounds.
       destruct x as [[[? ?] ?] [? ?]]. simpl in *. lia.
     Qed.
 
-  End UncurryBound. 
+  End UncurryBound.
 End Bounds.
-  

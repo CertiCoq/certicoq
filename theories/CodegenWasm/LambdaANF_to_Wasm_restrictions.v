@@ -1,6 +1,6 @@
 From Wasm Require Import datatypes operations.
 
-From Coq Require Import
+From Stdlib Require Import
   Program.Program
   Relations.Relations Relations.Relation_Operators
   Lia ZArith Nnat Uint63
@@ -8,7 +8,7 @@ From Coq Require Import
 
 From ExtLib Require Import Structures.Monad.
 
-From CertiCoq Require Import
+From CertiRocq Require Import
   LambdaANF.toplevel
   LambdaANF.cps_util
   Common.Pipeline_utils
@@ -16,7 +16,7 @@ From CertiCoq Require Import
   LambdaANF.cps
   LambdaANF.cps_show.
 
-From MetaCoq.Utils Require Import bytestring MCString.
+From MetaRocq.Utils Require Import bytestring MRString.
 
 Import MonadNotation compM ssreflect.
 
@@ -223,7 +223,7 @@ Proof.
   intros. eapply IH; eauto; clear IH.
   - (* Econstr *)
     intros ???? IHe Hrestr ? Hsub. inv Hrestr.
-    destruct (get_ctor_ord cenv t) eqn:Hord=>//.
+    destruct (get_ctor_ord cenv t) eqn:Hord=>//. cbn [Monad.bind MonadError] in H2.
     destruct (Z.of_N n <? Wasm_int.Int32.half_modulus)%Z eqn:Htupper=>//.
     destruct (Z.of_nat (Datatypes.length l) <=? max_constr_args)%Z eqn:Hlen=>//.
     cbn in H2.
@@ -242,6 +242,7 @@ Proof.
     intros ???? IHe IHe0 Hrestr ? Hsub. inv Hrestr.
     clear H0 H e. rename e0 into e.
     destruct (get_ctor_ord cenv c) eqn:Hord=>//.
+    cbn [Monad.bind MonadError] in H2.
     destruct ((Z.of_N n <? Wasm_int.Int32.half_modulus)%Z) eqn:Hupper=>//.
     cbn in H2. destruct (check_restrictions cenv e) eqn:Hrestr=>//.
     destruct (sequence _ ) eqn:Hseq; inv H2. destruct u.

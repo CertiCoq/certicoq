@@ -6,8 +6,8 @@ From ExtLib Require Import Monads.
 
 Require Import Common.Common Common.classes Common.Pipeline_utils Common.compM.
 From ExtLib Require Import Monads.
-From MetaCoq.Utils Require Import utils.
-From MetaCoq.Template Require Import Typing.
+From MetaRocq.Utils Require Import utils.
+From MetaRocq.Template Require Import Typing.
 Import MonadNotation.
 
  Definition wf_program (p : Ast.Env.program) := 
@@ -30,7 +30,7 @@ Import MonadNotation.
   }.
 
 Definition compile_LambdaBoxMut econf ip
-  : CertiCoqTrans (Ast.Env.program) (Program LambdaBoxMut.compile.Term) :=
+  : CertiRocqTrans (Ast.Env.program) (Program LambdaBoxMut.compile.Term) :=
   fun src =>
     debug_msg "Translating from L1g to L1k" ;;
-    (LiftCertiCoqTrans "LambdaBoxMut" (compile_program econf ip) src).
+    (LiftCertiRocqTrans "LambdaBoxMut" (compile_program econf ip) src).

@@ -1,12 +1,12 @@
-Require Import Arith List String.
+From Stdlib Require Import Arith List String.
 Require Import ExtLib.Structures.Monad.
-From CertiCoq.Plugin Require Import CertiCoq.
+From CertiRocq.Plugin Require Import CertiRocq.
 
 Import MonadNotation.
 Import ListNotations.
 Open Scope monad_scope.
 
-Require Import Coq.Strings.Ascii.
+From Stdlib Require Import Strings.Ascii.
 
 Inductive rgx : Type :=
 | empty   : rgx
@@ -64,5 +64,5 @@ Definition email :=
 Definition prog `{RegexFFI} :=
   exec email "name@example.com".
 
-CertiCoq Compile -args 5 prog.
-CertiCoq FFI -prefix "rgx_" RegexFFI.
+CertiRocq Compile -args 5 prog.
+CertiRocq FFI -prefix "rgx_" RegexFFI.

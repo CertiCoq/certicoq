@@ -3,12 +3,13 @@
     and pattern matching.
  *)
 
-Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String
-        Coq.Lists.List Coq.micromega.Lia Coq.Program.Program Coq.micromega.Psatz.
+From Stdlib Require Import Arith.Arith NArith.BinNat Strings.String
+        Lists.List micromega.Lia Program.Program micromega.Psatz.
 Require Export Common.Common.  (* shared namespace *)
 Open Scope N_scope.
 Opaque N.add.
 Opaque N.sub.
+From CertiRocq Require Import Pipeline_utils.
 Require Import LambdaBoxMut.compile.
 Module LambdaBoxMutt := LambdaBoxMut.compile.
 Require Import LambdaBoxLocal.expression.
@@ -30,10 +31,10 @@ Fixpoint cst_offset (e : env) (s : kername) : N :=
   | (c, e) :: tl => if eq_kername s c then 0 else 1 + cst_offset tl s
   end.
 
-Fixpoint find_prim (prims : list (kername * string * bool * nat * positive)) (n : kername) : option positive :=
+Fixpoint find_prim (prims : list (primitive * positive)) (n : kername) : option positive :=
   match prims with
   | [] => None
-  | (c, s, b, ar, pos) :: prims => if eq_kername n c then Some pos else find_prim prims n
+  | (prim, pos) :: prims => if eq_kername n prim.(prim_name) then Some pos else find_prim prims n
   end.
 
 (** Inductive environment, kept to record arities of constructors.
@@ -58,8 +59,8 @@ Section TermTranslation.
 
   Variable e : env.
 
-  Variable prims : list (kername * string * bool * nat * positive).
-           
+  Variable prims : list (primitive * positive).
+
   Section fixes.
     Variable trans : N -> LambdaBoxMutt.Term -> exp.
     Definition trans_args (k : N) (t : LambdaBoxMutt.Terms) : exps :=
@@ -89,9 +90,9 @@ Section TermTranslation.
     | LambdaBoxMutt.TLetIn n t u => Let_e n (trans k t) (trans (1+k) u)
     | LambdaBoxMutt.TApp t u => App_e (trans k t) (trans k u)
     | LambdaBoxMutt.TConst s =>
-      match find_prim prims s with 
+      match find_prim prims s with
       | Some p => Prim_e p
-      | None => 
+      | None =>
         (* Transform to let-binding *)
         Var_e (cst_offset e s + k)
       end
@@ -114,9 +115,9 @@ Section TermTranslation.
 End TermTranslation.
 
 Section EnvTranslation.
-  
-  Variable prims : list (kername * string * bool * nat * positive).
-  
+
+  Variable prims : list (primitive * positive).
+
   Definition translate_entry x acc :=
     match x with
     | (s, ecTrm t) =>
@@ -157,7 +158,7 @@ Definition mkLets (e : env) (t : exp) :=
 
 (* TODO, pass ienv too *)
 Definition translate_program
-           (prims : list (kername * string * bool * nat * positive))
+           (prims : list (primitive * positive))
            (e: environ LambdaBoxMut.compile.Term) (t: LambdaBoxMutt.Term) : exp :=
   let e' := translate_env prims e in
   mkLets e' (translate e' prims t).

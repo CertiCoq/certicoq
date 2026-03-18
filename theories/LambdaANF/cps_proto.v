@@ -1,17 +1,17 @@
-(* The stack-of-frames one-hole contexts, with the right indices, are isomorphic to 
+(* The stack-of-frames one-hole contexts, with the right indices, are isomorphic to
    [cps.exp_ctx] and [cps.fundefs_ctx] *)
 
-From Coq Require Import ZArith.ZArith Lists.List Sets.Ensembles Strings.String.
-Require Import Lia.
+From Stdlib Require Import ZArith.ZArith Lists.List Sets.Ensembles Strings.String.
+From Stdlib Require Import Lia.
 Import ListNotations.
-From CertiCoq.Common Require AstCommon.
-From CertiCoq.LambdaANF Require Import
+From CertiRocq.Common Require AstCommon.
+From CertiRocq.LambdaANF Require Import
      Prototype cps cps_util ctx
      identifiers Ensembles_util.
 
-From MetaCoq Require Import Template.All.
+From MetaRocq Require Import Template.All.
 
-From CertiCoq.LambdaANF Require Import PrototypeGenFrame cps cps_proto_univ.
+From CertiRocq.LambdaANF Require Import PrototypeGenFrame cps cps_proto_univ.
 
 (* Print exp_univ. *)
 (* Print exp_univD. *)
@@ -70,8 +70,8 @@ Defined.
 Definition c_of_ces_ctx := c_of_ces_ctx' c_of_exp_ctx.
 
 (* exp_c _ _ -> cps.exp_ctx: directly writing a recursive function on exp_c is annoying because
-   of the indices. Instead map each frame to a "slice" of an exp_ctx represented as a function 
-   ctx |-> slice + ctx. Then all the functions can be composed together and initialized with 
+   of the indices. Instead map each frame to a "slice" of an exp_ctx represented as a function
+   ctx |-> slice + ctx. Then all the functions can be composed together and initialized with
    the empty context. *)
 
 Definition univ_rep (A : exp_univ) : Set :=
@@ -87,7 +87,7 @@ Definition univ_rep (A : exp_univ) : Set :=
   | exp_univ_prim => False
   | exp_univ_N => False
   | exp_univ_list_var => False
-  | exp_univ_primitive => False
+  | exp_univ_primitive_value => False
   end.
 
 Definition exp_frame_rep {A B} (f : exp_frame_t A B) : univ_rep A -> univ_rep B.
@@ -370,7 +370,7 @@ Definition used {A} : univD A -> Ensemble cps.var :=
   | exp_univ_prim => fun _ => Empty_set _
   | exp_univ_N => fun _ =>  Empty_set _
   | exp_univ_list_var => fun xs => FromList xs
-  | exp_univ_primitive => fun _ => Empty_set _
+  | exp_univ_primitive_value => fun _ => Empty_set _
   end.
 
 (*
@@ -529,8 +529,8 @@ Definition decompose_fd_c := @decompose_fd_c' exp_univ_fundefs exp_univ_exp.
 #[global] Instance exp_Frame_inj : Frame_inj (U:=exp_univ).
 Proof. intros A B f x y; destruct f; now inversion 1. Qed.
 
-Require Import Coq.Logic.JMeq.
-Require Import Coq.Logic.Eqdep.
+From Stdlib Require Import Logic.JMeq.
+From Stdlib Require Import Logic.Eqdep.
 Ltac inv_ex :=
   repeat progress match goal with
   | H : existT ?P ?T _ = existT ?P ?T _ |- _ => apply inj_pairT2 in H
@@ -551,8 +551,8 @@ Class Inhabited A := inhabitant : A.
 
 Import PrimInt63.
 
-Global Instance Inhabited_primitive : Inhabited AstCommon.primitive := 
-  { inhabitant := existT _ AstCommon.primInt 0%uint63 }.  
+Global Instance Inhabited_primitive_value : Inhabited AstCommon.primitive_value :=
+  { inhabitant := existT _ AstCommon.primInt 0%uint63 }.
 
 Definition univ_inhabitant {A} : univD A :=
   match A with
@@ -566,14 +566,14 @@ Definition univ_inhabitant {A} : univD A :=
   | exp_univ_prim => inhabitant
   | exp_univ_N => inhabitant
   | exp_univ_list_var => inhabitant
-  | exp_univ_primitive => inhabitant
+  | exp_univ_primitive_value => inhabitant
   end.
 
 Class Sized A := size : A -> nat.
 
 #[global] Instance Sized_pos : Sized positive := fun _ => S O.
 #[global] Instance Sized_N : Sized N := fun _ => S O.
-#[global] Instance Sized_primitive : Sized AstCommon.primitive := fun _ => S O.
+#[global] Instance Sized_primitive : Sized AstCommon.primitive_value := fun _ => S O.
 
 Definition size_list {A} (size : A -> nat) : list A -> nat := fold_right (fun x n => S (size x + n)) 1%nat.
 Definition size_prod {A B} (sizeA : A -> nat) (sizeB : B -> nat) : A * B -> nat := fun '(x, y) => S (sizeA x + sizeB y).
@@ -616,7 +616,7 @@ Definition univ_size {A} : univD A -> nat :=
   | exp_univ_prim => size
   | exp_univ_N => size
   | exp_univ_list_var => size
-  | exp_univ_primitive => size
+  | exp_univ_primitive_value => size
   end.
 
 Lemma size_app {A} `{Sized A} (xs ys : list A) : size (xs ++ ys) < size xs + size ys.
@@ -631,7 +631,7 @@ Proof.
   try change (size_list (size_prod size size) x) with (size x); cbn;
   try change (size x) with 1; cbn;
   try lia.
-  
+
   change ((fix size_exp (e : exp) : nat :=
             match e with
             | Ecase _ ces => S (S (size_list (size_prod size size_exp) ces))
@@ -669,7 +669,7 @@ Proof.
                end
                  for
                  size_fundefs) x) with (size x).
-  cbn. lia.  
+  cbn. lia.
 Qed.
 
 Lemma exp_c_size_ge {A B} (C : exp_c A B) (x : univD A) :

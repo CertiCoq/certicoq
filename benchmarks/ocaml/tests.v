@@ -1,17 +1,17 @@
-Require Import Arith List String.
-Require Import CertiCoq.Benchmarks.lib.vs.
-Require Import CertiCoq.Benchmarks.lib.Binom.
-Require Import CertiCoq.Benchmarks.lib.Color.
-Require Import CertiCoq.Benchmarks.lib.sha256.
+From Stdlib Require Import Arith List String.
+Require Import CertiRocq.Benchmarks.lib.vs.
+Require Import CertiRocq.Benchmarks.lib.Binom.
+Require Import CertiRocq.Benchmarks.lib.Color.
+Require Import CertiRocq.Benchmarks.lib.sha256.
 
-From CertiCoq.Plugin Require Import CertiCoq.
+From CertiRocq.Plugin Require Import CertiRocq.
 
 Open Scope string.
 
 Import ListNotations.
 Import VeriStar.
 
-(* The same benchmarks as CertiCoq benchmarks, but slightly modified
+(* The same benchmarks as CertiRocq benchmarks, but slightly modified
    to suspend computations with unit so we can run multiple times *)
 
 

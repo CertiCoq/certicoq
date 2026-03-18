@@ -1,12 +1,12 @@
-(* Continuation-Passing Style language for the CertiCoq project.
+(* Continuation-Passing Style language for the CertiRocq project.
  *   Initial design, Andrew W. Appel, June 2014
  *)
-From Coq Require Import ZArith.ZArith Lists.List.
-From CertiCoq.Common Require Import AstCommon.
-From CertiCoq.LambdaANF Require Import List_util map_util.
+From Stdlib Require Import ZArith.ZArith Lists.List.
+From CertiRocq.Common Require Import AstCommon.
+From CertiRocq.LambdaANF Require Import List_util map_util.
 From compcert.lib Require Export  Maps.
-From CertiCoq.LambdaANF Require Export map_util.
-From MetaCoq.Common Require Import BasicAst. (* For identifier names *)
+From CertiRocq.LambdaANF Require Export map_util.
+From MetaRocq.Common Require Import BasicAst. (* For identifier names *)
 
 Import ListNotations.
 
@@ -60,19 +60,17 @@ Inductive exp : Type :=
 | Eletapp: var -> var -> fun_tag -> list var -> exp -> exp
 | Efun: fundefs -> exp -> exp
 | Eapp: var -> fun_tag -> list var -> exp
-| Eprim_val : var -> primitive -> exp -> exp
+| Eprim_val: var -> primitive_value -> exp -> exp
 | Eprim: var -> prim -> list var -> exp -> exp (* where prim is id *)
-| Ehalt : var -> exp
+| Ehalt: var -> exp
 with fundefs : Type :=
 | Fcons: var -> fun_tag -> list var -> exp -> fundefs -> fundefs
 | Fnil: fundefs.
 
-(* [Econstr x t c ys e] applies a data constructor with tag [c] to
+(* [Econstr x c ys e] applies a data constructor with tag [c] to
            a list of values denoted by variables [ys].   The resulting
-           value is bound to variable [x] of type [t], and then execution
-           continues with expression [e].  Static typing requires that
-           the typeinfo bound to [t] has a variant consistent with [c]
-           and the types of [ys].
+           value is bound to variable [x], and then execution
+           continues with expression [e].
    [Ecase v cl] does case-discrimination on value [v], which
           must be a [Vconstr t c vs] value. One of the elements of
           [cl] must be the pair [(c,e)], where [e] a expression
@@ -82,17 +80,17 @@ with fundefs : Type :=
           and execution continues with [e].  Typechecking requires
           that the type of [y] be a Tdata with a single variant, whose
           data list has length at least n.
-   [Efun x f ft ys e] applies the function f to arguments ys and binds the result
+   [Eletapp x f ft ys e] applies the function f to arguments ys and binds the result
          to x in e.
    [Efun fl e]  binds the set of mutually recursive functions [fl]
           into the environment, and continues with [e].
-   [Eapp f ys]   applies the function [f] to arguments [ys]
-   [Eprim x t f ys e] applies primop [f] to arguments [ys]
-          and binds the result to [x] of type [t], continues with [e].
+   [Eapp f ft ys]   applies the function [f] to arguments [ys]
+   [Eprim x f ys e] applies primop [f] to arguments [ys]
+          and binds the result to [x], continues with [e].
           The primop [f] is a primitive operator, whose type is equivalent to
-          the CPS transform of [ts->t], where [ts] are the type of the [ys].
+          the CPS transform of [ts->t], where [ts] are the types of the [ys].
 
-   [Fdef f t ys e]   defines a function [f] of type [t] with parameters [ys]
+   [Fcons f t ys e _]   defines a function [f] of type [t] with parameters [ys]
           and body [e].  We do not syntactically distinguish continuations
           from other functions, as Andrew Kennedy does [Compiling with
           Continuations, Continued, 2007].  Instead, we rely on the type
@@ -297,7 +295,7 @@ Lemma exp_def_mutual_ind' :
     (forall (v : var) (t : ctor_tag) (n : N) (v0 : var) (e : exp),
         P e -> P (Eproj v t n v0 e)) ->
     (forall (x f : var) (ft : fun_tag) (ys : list var) (e : exp),
-        P e -> P (Eletapp x f ft ys e)) ->    
+        P e -> P (Eletapp x f ft ys e)) ->
     (forall f2 : fundefs, P0 f2 -> forall e : exp, P e -> P (Efun f2 e)) ->
     (forall (v : var) (t : fun_tag) (l : list var), P (Eapp v t l)) ->
     (forall v p e, P e -> P (Eprim_val v p e)) ->
@@ -338,7 +336,7 @@ Inductive val : Type :=
 (* [Vfun env fds f]
      where env is the environment at the function binding site
      fds is the list of mutually recursive functions including f *)
-| Vprim : primitive -> val
+| Vprim : primitive_value -> val
 | Vint : Z -> val.
 
 (** Induction principle for values. *)

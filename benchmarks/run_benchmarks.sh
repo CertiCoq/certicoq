@@ -22,11 +22,11 @@ do
     ./ocaml/mainopt $N > ocamlopt_bench_$i.txt
 done
     
-echo "Running CertiCoq programs..."
+echo "Running CertiRocq programs..."
 
 fmt="%-11s%-10s%-7s%-7s%-11s%-7s%-7s%-11s%-7s%-7s%-12s%-7s%-7s%-9s%-7s%-7s%-10s%-7s%-7s\n"
 
-printf "$fmt" "Benchmark" "CertiCoq" "Ratio" "Dev" "CertiCoqO" "Ratio" "Dev" "CertiCoqL" "Ratio" "Dev" "CertiCoqCC" "Ratio" "Dev" "ocamlc" "Ratio" "Dev" "ocamlopt" "Ratio" "Dev"
+printf "$fmt" "Benchmark" "CertiRocq" "Ratio" "Dev" "CertiRocqO" "Ratio" "Dev" "CertiRocqL" "Ratio" "Dev" "CertiRocqCC" "Ratio" "Dev" "ocamlc" "Ratio" "Dev" "ocamlopt" "Ratio" "Dev"
 
 
 for f in $FILES

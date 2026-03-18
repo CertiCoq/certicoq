@@ -1,5 +1,5 @@
-QUAL=CertiCoq.Benchmarks.hash
-QUALS=CertiCoq.Benchmarks.hash.hash
+QUAL=CertiRocq.Benchmarks.hash
+QUALS=CertiRocq.Benchmarks.hash.hash
 COQOPTS = -R ./ $(QUAL)
 CCOMPILER=gcc
 

@@ -1,7 +1,7 @@
 Running each test 10 times
 Running ocamlc and ocamlopt programs...
-Running CertiCoq programs...
-Benchmark  CertiCoq  Ratio  Dev    CertiCoqO  Ratio  Dev    CertiCoqL  Ratio  Dev    CertiCoqCC  Ratio  Dev    ocamlc   Ratio  Dev    ocamlopt  Ratio  Dev    
+Running CertiRocq programs...
+Benchmark  CertiRocq  Ratio  Dev    CertiRocqO  Ratio  Dev    CertiRocqL  Ratio  Dev    CertiRocqCC  Ratio  Dev    ocamlc   Ratio  Dev    ocamlopt  Ratio  Dev    
 demo1      0.039     1.000  0.053  0.039      1.009  0.053  0.038      0.982  0.038  0.039       1.013  0.054  0.032    0.832  0.078  0.018     0.456  0.025  
 demo2      0.013     1.000  0.063  0.013      0.947  0.027  0.013      0.951  0.030  0.014       1.017  0.165  0.010    0.741  0.051  0.006     0.434  0.086  
 list_sum   0.063     1.000  0.011  0.062      0.983  0.042  0.062      0.982  0.038  0.065       1.032  0.014  0.105    1.667  0.100  0.041     0.647  0.039  

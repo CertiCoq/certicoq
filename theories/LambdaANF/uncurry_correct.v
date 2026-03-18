@@ -1,15 +1,15 @@
 Require Import LambdaANF.cps LambdaANF.size_cps LambdaANF.cps_util LambdaANF.eval LambdaANF.logical_relations LambdaANF.set_util LambdaANF.identifiers LambdaANF.ctx
         LambdaANF.Ensembles_util LambdaANF.List_util LambdaANF.alpha_conv LambdaANF.functions LambdaANF.uncurry LambdaANF.uncurry_rel
         LambdaANF.shrink_cps_correct LambdaANF.algebra.
-Require Import FunInd.
-Require Import Coq.ZArith.Znumtheory Coq.Relations.Relations Coq.Arith.Wf_nat.
-Require Import Coq.Strings.String.
-Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
-        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles micromega.Lia.
+From Stdlib Require Import FunInd.
+From Stdlib Require Import ZArith.Znumtheory Relations.Relations Arith.Wf_nat.
+From Stdlib Require Import Strings.String.
+From Stdlib Require Import Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
+        NArith.BinNat PArith.BinPos Sets.Ensembles micromega.Lia.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 
 Require Import Common.compM.
-Require Import Lia.
+From Stdlib Require Import Lia.
 
 Require LambdaANF.Prototype LambdaANF.cps_proto LambdaANF.proto_util LambdaANF.uncurry_proto.
 
@@ -34,11 +34,11 @@ Section uncurry_correct.
           (Hpost_propG : Post_properties cenv PostG PostG PostG).
 
   Context (Hpost_curry :
-             forall e rho rho' rho'' c1 c2 cout1 cout2 f1 ft1 fv1 gv1, 
+             forall e rho rho' rho'' c1 c2 cout1 cout2 f1 ft1 fv1 gv1,
                Post (e, rho, c1, cout1) (e, rho'', c2, cout2) ->
                PostG (e, rho, c1, cout1)
-                     (Eapp f1 ft1 (gv1 ++ fv1), rho', plus c2 (one (Eapp f1 ft1 (gv1 ++ fv1))), plus cout2 (one (Eapp f1 ft1 (gv1 ++ fv1))))). 
-  
+                     (Eapp f1 ft1 (gv1 ++ fv1), rho', plus c2 (one (Eapp f1 ft1 (gv1 ++ fv1))), plus cout2 (one (Eapp f1 ft1 (gv1 ++ fv1))))).
+
   Context (Hpost_idemp : inclusion _ (comp PostG PostG) PostG).
   Context (Hpost_inclusion' : inclusion _ PostG Post).
 
@@ -54,7 +54,7 @@ Section uncurry_correct.
     do 3 eexists. split; [eassumption|split]; [eassumption|].
 
     intros Hj Hvs. apply preord_exp_refl. eassumption.
-    
+
     assert (preord_env_P cenv Post' (occurs_free_fundefs fds :|: name_in_fundefs fds) j
                          (def_funs fds fds rho rho)
                          (def_funs fds fds rho1 rho1)). {
@@ -65,8 +65,8 @@ Section uncurry_correct.
     }
     clear H.
     eapply preord_env_P_set_lists_l; [eassumption| |eassumption|eauto|eauto].
-    
-    
+
+
     apply find_def_correct in H1.
     assert (occurs_free e1 \\ FromList xs1 \subset occurs_free_fundefs fds :|: name_in_fundefs fds). {
       apply occurs_free_in_fun in H1.
@@ -399,7 +399,7 @@ Section uncurry_correct.
 
     split_var_in_fundefs
       h
-      curried 
+      curried
       Hfds; clear Hfds; rename n into Hfds; simpl in Hfds.
     - (* h\in pre_fds ++ f |: fundefs(fds) *)
       rewrite def_funs_eq; auto.
@@ -431,7 +431,7 @@ Section uncurry_correct.
         eapply preord_exp_fun_compat.
         now eapply Hpost_propG.
         now eapply Hpost_propG.
-        
+
         apply preord_exp_refl. eassumption.
 
         (* wrt k0 and g, the environments
@@ -476,7 +476,7 @@ Section uncurry_correct.
             rewrite <- Hfv_fv1.
             reflexivity.
           }
-          (* Transparent preord_exp. *) intros v1 c1 cout Hc1 Hv1. 
+          (* Transparent preord_exp. *) intros v1 c1 cout Hc1 Hv1.
           apply @length_exists_set_lists with
             (rho := (def_funs uncurried uncurried rho1 rho1)) in Hrho'''.
           destruct Hrho''' as [rho''' Hrho'''].
@@ -486,13 +486,13 @@ Section uncurry_correct.
             (* wrt free variables of ge, the environments
                  rho'' = [gv -> vs3] + g + [k0 :: fv -> vs1] + curried f + fds + rho
                  rho''' = [gv ++ fv -> vs4 ++ tvs2] + uncurried f + f1 + fds + rho1
-               agree. 
+               agree.
              *)
 
             (* rho''g := rho'' \ g *)
             eapply set_lists_set_permut in Hgv_g; [|apply Hrho''].
             destruct Hgv_g as [rho''g [Hrho''g Hrho''_rho''g]].
-            eapply preord_env_P_subst; [|intros a Ha;symmetry; apply Hrho''_rho''g|reflexivity]. 
+            eapply preord_env_P_subst; [|intros a Ha;symmetry; apply Hrho''_rho''g|reflexivity].
             apply preord_env_P_set_not_in_P_l;
               [|apply Disjoint_Union_r with (s1 := bound_var ge);
                 replace (bound_var ge :|: occurs_free ge) with (used_vars ge) by reflexivity;
@@ -625,7 +625,7 @@ Section uncurry_correct.
                 apply Free_Efun2; apply Free_Fcons1; [|assumption|inversion 1|assumption].
                 intros contra; subst.
                 rewrite occurs_in_exp_correct in Hg_nonrec.
-                rewrite Disjoint_Singleton_In in Hg_nonrec; auto with Decidable_DB. 
+                rewrite Disjoint_Singleton_In in Hg_nonrec; auto with Decidable_DB.
                 contradiction Hg_nonrec; now right.
             }
 
@@ -645,7 +645,7 @@ Section uncurry_correct.
           eexists; exists (plus c2 (one (Eapp f1 ft1 (gv1 ++ fv1) : exp))),
                    (plus cout' (one (Eapp f1 ft1 (gv1 ++ fv1) : exp))); split; [|split; [|eassumption]].
           2: { eapply Hpost_curry. eassumption. }
-          
+
           apply BStepf_run.
           eapply BStept_app; eauto.
           { erewrite <- set_lists_not_In; [|symmetry; eassumption|assumption].
@@ -703,7 +703,7 @@ Section uncurry_correct.
         (* wrt free variables of e1, the environments
              rho' = [xs1 -> vs1] + f + fds + rho
              rho1' = [xs1 -> vs2] + f + f1 + fds + rho1
-           agree. 
+           agree.
          *)
 
         (* [[xs1]](rho') ==_k1 [[xs1]](rho1') *)
@@ -1065,7 +1065,7 @@ Section uncurry_correct.
 
     split_var_in_fundefs
       h
-      curried 
+      curried
       Hfds; clear Hfds; rename n into Hfds; simpl in Hfds.
     - (* h\in pre_fds ++ f |: fundefs(fds) *)
       rewrite def_funs_eq; auto.
@@ -1132,7 +1132,7 @@ Section uncurry_correct.
           rewrite <- Hfv_fv1.
           reflexivity.
         }
-        (* Transparent preord_exp. *) intros v1 c1 cout Hc1 Hv1. 
+        (* Transparent preord_exp. *) intros v1 c1 cout Hc1 Hv1.
         apply @length_exists_set_lists with
           (rho := (def_funs uncurried uncurried rho1 rho1)) in Hrho'''.
         destruct Hrho''' as [rho''' Hrho'''].
@@ -1141,13 +1141,13 @@ Section uncurry_correct.
           (* wrt free variables of ge, the environments
                rho'' = [gv -> vs3] + g + [k0 :: fv -> vs1] + curried f + fds + rho
                rho''' = [gv ++ fv -> vs4 ++ tvs2] + uncurried f + f1 + fds + rho1
-             agree. 
+             agree.
            *)
 
           (* rho''g := rho'' \ g *)
           eapply set_lists_set_permut in Hgv_g; [|apply Hrho''].
           destruct Hgv_g as [rho''g [Hrho''g Hrho''_rho''g]].
-          eapply preord_env_P_subst; [|intros a Ha;symmetry; apply Hrho''_rho''g|reflexivity]. 
+          eapply preord_env_P_subst; [|intros a Ha;symmetry; apply Hrho''_rho''g|reflexivity].
           apply preord_env_P_set_not_in_P_l;
             [|apply Disjoint_Union_r with (s1 := bound_var ge);
               replace (bound_var ge :|: occurs_free ge) with (used_vars ge) by reflexivity;
@@ -1164,7 +1164,7 @@ Section uncurry_correct.
           (* rho'k0 := rho' *)
           (* eapply set_set_lists in Hrho'; destruct Hrho' as [rho'k0 [Hrho' Hrho'k0]]; subst rho'. *)
           rename rho' into rho'k0, Hrho' into Hrho'k0.
-          
+
           (*
           apply preord_env_P_set_not_in_P_l;
             [|eapply Disjoint_Included_l;
@@ -1280,7 +1280,7 @@ Section uncurry_correct.
               apply Free_Efun2; apply Free_Fcons1; [|assumption|inversion 1|assumption].
               intros contra; subst.
               rewrite occurs_in_exp_correct in Hg_nonrec.
-              rewrite Disjoint_Singleton_In in Hg_nonrec; auto with Decidable_DB. 
+              rewrite Disjoint_Singleton_In in Hg_nonrec; auto with Decidable_DB.
               contradiction Hg_nonrec; now right.
           }
 
@@ -1355,7 +1355,7 @@ Section uncurry_correct.
         (* wrt free variables of e1, the environments
              rho' = [xs1 -> vs1] + f + fds + rho
              rho1' = [xs1 -> vs2] + f + f1 + fds + rho1
-           agree. 
+           agree.
          *)
 
         (* [[xs1]](rho') ==_k1 [[xs1]](rho1') *)
@@ -1620,7 +1620,7 @@ Section uncurry_correct.
           inversion Hx1. apply Free_Eletapp2; [|assumption].
           intros contra. subst. intuition.
         * assumption.
-    - (* uncurry_constr *)      
+    - (* uncurry_constr *)
       eapply preord_exp_constr_compat; try eassumption; try easy_post.
       + eapply Hpost_prop.
       + eapply Hpost_prop.
@@ -1683,7 +1683,7 @@ Section uncurry_correct.
     - (* uncurry_proj *)
       eapply preord_exp_proj_compat; try eassumption; try easy_post.
       now eapply Hpost_prop.
-      now eapply Hpost_prop. 
+      now eapply Hpost_prop.
       now apply Henv.
       intros k' v1 v2 Hk' Hv1_v2.
       apply IH; inv Hunique; inv Hunique1; auto.
@@ -1828,7 +1828,7 @@ Section uncurry_correct.
     - eapply uncurry_step_correct; [| | | |apply H5|apply Henv]; auto.
     - intros; eapply IHn; [| | | |apply H6|apply preord_env_P_refl]; auto.
   Qed.
-  
+
   Transparent bind ret.
 
   (* Helper functions to extract fields from state *)
@@ -1872,10 +1872,10 @@ Section uncurry_correct.
     (forall x, total (f x)) ->
     total (bind m f).
   Proof. intros Hm Hf' P; eapply bind_triple; [apply Hm|intros; apply Hf']. Qed.
-  
+
   Hint Resolve ret_total : TotalDB.
   Hint Extern 1 (total (_ <- _ ;; _)) => (apply bind_total; [|let x := fresh "arbitrary" in intros x]) : TotalDB.
-  
+
   Lemma get_triple' {R W} P :
     {{ P }} compM.get {{ fun (r : R) (w : W) (x : W) (w' : W) => x = w /\ w = w' }}.
   Proof. unfold triple; intros. simpl. eauto. Qed.
@@ -1903,7 +1903,7 @@ Section uncurry_correct.
   Proof. unfold state.put_state; auto with TotalDB. Qed.
 
   Hint Resolve get_state_total put_state_total : TotalDB.
-  
+
   Lemma already_uncurried_total x : total (uncurry.already_uncurried x).
   Proof.
     unfold uncurry.already_uncurried.
@@ -1911,7 +1911,7 @@ Section uncurry_correct.
     destruct x' as [[[b aenv] lm] s].
     destruct (lm ! x) as [[] |]; apply ret_total.
   Qed.
-  
+
   Lemma get_name_total {S} x s : total (@state.get_name S x s).
   Proof.
     unfold state.get_name.
@@ -1919,27 +1919,27 @@ Section uncurry_correct.
     destruct x0 as [[] st].
     apply bind_total; [apply put_total|apply ret_total].
   Qed.
-  
+
   Lemma get_names_lst_total {S} xs s : total (@state.get_names_lst S xs s).
   Proof.
     induction xs; unfold state.get_names_lst, mapM; [apply ret_total|].
     apply bind_total; [apply get_name_total|intros x].
     apply bind_total; [apply IHxs|intros x0; apply ret_total].
   Qed.
-  
+
   Lemma mark_as_uncurried_total x : total (mark_as_uncurried x).
   Proof.
     unfold mark_as_uncurried.
     apply bind_total; [apply get_state_total|intros [[[b aenv] lm] s]].
     apply put_state_total.
   Qed.
-  
+
   Lemma click_total : total click.
   Proof.
     unfold click; apply bind_total; [apply get_state_total|intros [[[b aenv] lm] s]].
     apply put_state_total.
   Qed.
-  
+
   Lemma markToInline_total xs v1 v2 : total (markToInline xs v1 v2).
   Proof.
     unfold markToInline.
@@ -1953,7 +1953,7 @@ Section uncurry_correct.
     apply bind_total; [apply get_total|].
     intros [[] s]; apply bind_total; [apply put_total|intros []; apply ret_total].
   Qed.
-  
+
   Lemma get_fun_tag_total n : total (get_fun_tag n).
   Proof.
     unfold get_fun_tag; apply bind_total; [apply get_state_total|].
@@ -1978,7 +1978,7 @@ Section uncurry_correct.
     | inl e => P e
     | inr fds => Q fds
     end.
-  
+
   (* uncurry_exp is total *)
   Lemma uncurry_total b a :
     l6_stmt (fun e => total (uncurry_exp b e)) (fun fds => total (uncurry_fundefs b fds)) a.
@@ -2008,7 +2008,7 @@ Section uncurry_correct.
 
   Definition uncurry_exp_total b e : total (uncurry_exp b e) := uncurry_total b (inl e).
   Definition uncurry_fundefs_total b fds : total (uncurry_fundefs b fds) := uncurry_total b (inr fds).
-    
+
   (* arms of a case block are preserved by uncurrying *)
   Lemma uncurry_exp_Ecase b x l :
     {{ fun _ _ => True }}
@@ -2070,7 +2070,7 @@ Section uncurry_correct.
 
   Definition from_maxvar v := fun a => (a < v)%positive.
   Definition from_fresh st := from_maxvar (next_free st).
-  
+
 
   Lemma already_uncurried_triple : forall s f,
     {{fun _ s' => s = s'}} uncurry.already_uncurried f
@@ -2239,7 +2239,7 @@ Section uncurry_correct.
     eapply post_weakening; [|apply put_triple']; cbn.
     intros [] w [] w' [? Hw] Hw'; subst w w'; unfold from_fresh; now cbn.
   Qed.
-  
+
   Lemma click_triple : forall s,
     {{fun _ s' => s = s'}} uncurry.click
     {{fun _ s _ s1 =>
@@ -2315,7 +2315,7 @@ Section uncurry_correct.
     fst s = fst s' ->
     from_fresh s <--> from_fresh s'.
   Proof. destruct s, s'; cbn; now inversion 1. Qed.
-  
+
   Lemma uncurry_corresp_mut a :
     let P e := forall b,
       {{ fun _ st => unique_bindings e /\ used_vars e \subset from_fresh st }}
@@ -2440,7 +2440,7 @@ Section uncurry_correct.
       + (* Efun *)
         eapply pre_eq_state_lr; intros [] st [Huniq Hused].
         unfold uncurry_exp; fold uncurry_exp; fold uncurry_fundefs.
-        eapply bind_triple'. 
+        eapply bind_triple'.
         rewrite pre_post_copy.
         eapply pre_strenghtening; [|use_IH IHn].
         intros [] i [_ Hi]; subst i.
@@ -2662,13 +2662,13 @@ Section uncurry_correct.
                       apply not_occurs_in_exp_iff_used_vars; intros contra
                   | [ _ : ?a = next_free ?s |- ~ In _ (from_fresh ?s) ?a ] =>
                       subst a; apply next_free_not_In_from_fresh
-                end. 
+                end.
                 ** contradiction H2.
                 ** contradiction H1.
                 ** eapply next_free_not_In_from_fresh.
                 ** rewrite Union_commut. rewrite <- Hst4.
                    rewrite Hst8, Hst7, Hst6, Hst5.
-                   eapply from_fresh_fst_eq. congruence. 
+                   eapply from_fresh_fst_eq. congruence.
                 ** now rewrite <- Hst2_m, <- Hst3_m, <- Hst4_m, Hst8_m, Hst7_m, Hst6_m, Hst5_m.
              ++ eapply bind_triple; [eapply pre_post_copy; eapply pre_strenghtening; [|use_IH IHn] |].
                  { intros [] st0' [_ Hst0']; subst; cbn; split; [now inv Huniq|];
@@ -2797,12 +2797,12 @@ Section uncurry_correct.
                    apply not_occurs_in_exp_iff_used_vars; intros contra
                | [ _ : ?a = next_free ?s |- ~ In _ (from_fresh ?s) ?a ] =>
                    subst a; apply next_free_not_In_from_fresh
-             end. 
+             end.
              ++ contradiction.
              ++ eapply next_free_not_In_from_fresh.
              ++ rewrite Union_commut. rewrite <- Hst4.
                 rewrite Hst8, Hst7, Hst6, Hst5.
-                eapply from_fresh_fst_eq. congruence. 
+                eapply from_fresh_fst_eq. congruence.
              ++ now rewrite <- Hst2_m, <- Hst3_m, <- Hst4_m, Hst8_m, Hst7_m, Hst6_m, Hst5_m.
           -- eapply bind_triple; [eapply pre_post_copy; eapply pre_strenghtening; [|use_IH IHn] |].
               { intros [] st0' [_ Hst0']; subst; cbn; split; [now inv Huniq|];
@@ -2836,7 +2836,7 @@ Section uncurry_correct.
                      e1 (from_fresh st1) (already_uncurried st1)
     }}.
   Proof. intros; eapply (uncurry_corresp_mut (inl e)); eauto. Qed.
-  
+
   Corollary uncurry_fundefs_corresp : forall b f,
     {{ fun _ st => unique_bindings_fundefs f /\ used_vars_fundefs f \subset from_fresh st }}
       uncurry_fundefs b f
@@ -2868,7 +2868,7 @@ Section uncurry_correct.
     - cbn. intros [] w x w' H' [n Hrel] [_ Hw]; subst w.
       eapply H; eauto.
   Qed.
-  
+
   Lemma uncurry_exp_correct : forall b e,
     uncurry_triple b e (fun _ => True) (fun e _ e1 _ => forall k, ctx_preord_exp k e e1).
   Proof.
@@ -2885,7 +2885,7 @@ Section uncurry_correct.
     intros; apply uncurry_rel_to_triple; simpl; intros.
     eapply uncurry_rel_preserves_closed; eauto.
   Qed.
-  
+
   Lemma uncurry_exp_fv_preserving : forall b e,
     uncurry_triple b e (fun _ => True) (fun _ _ e1 _ => occurs_free e <--> occurs_free e1).
   Proof.
@@ -2959,7 +2959,7 @@ Proof.
     do 10 normalize_bound_var. repeat normalize_sets.
     repeat match goal with
            | |- _ :|: _ \subset _ => apply Union_Included
-           | |- bound_var_fundefs Fnil \subset _ => 
+           | |- bound_var_fundefs Fnil \subset _ =>
              eapply Included_trans; [apply bound_var_fundefs_Fnil|]; eauto with Ensembles_DB
            end; eauto 10 with Ensembles_DB.
     + intros x Hx; right; intros Hoops. destruct Hfv1 as [[HC] _]. specialize (HC x).
@@ -2987,7 +2987,7 @@ Proof.
     do 10 normalize_bound_var. repeat normalize_sets.
     repeat match goal with
            | |- _ :|: _ \subset _ => apply Union_Included
-           | |- bound_var_fundefs Fnil \subset _ => 
+           | |- bound_var_fundefs Fnil \subset _ =>
              eapply Included_trans; [apply bound_var_fundefs_Fnil|]; eauto with Ensembles_DB
            end; eauto 10 with Ensembles_DB.
     + intros x Hx; right; intros Hoops. destruct Hfv1 as [[HC] _]. specialize (HC x).

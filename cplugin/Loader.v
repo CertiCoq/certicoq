@@ -1,3 +1,3 @@
-Declare ML Module "coq-certicoq-vanilla.plugin".
+Declare ML Module "rocq-certirocq-vanilla.plugin".
 
-CertiCoq Extract Inductives [ bool => "bool" [ 1 0 ]].
+CertiRocq Extract Inductives [ bool => "bool" [ 1 0 ]].

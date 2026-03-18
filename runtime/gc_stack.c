@@ -291,7 +291,7 @@ void do_generation (struct space *from,  /* descriptor of from-space */
   forward_remset(from, to, &to->next);
   forward_roots(from->start, from->limit, &to->next, fr);
   do_scan(from->start, from->limit, p, &to->next);
-  #ifdef CERTICOQ_DEBUG_GC
+  #ifdef CERTIROCQ_DEBUG_GC
   fprintf(stderr,"%5.3f%% occupancy\n",
 	  (to->next-p)/(double)(from->next-from->start));
   #endif
@@ -413,7 +413,7 @@ void garbage_collect(struct thread_info *ti)
         create_space(h->spaces+(i+1), RATIO*w);
       }
       /* Copy all the objects in generation i, into generation i+1 */
-      #ifdef CERTICOQ_DEBUG_GC
+      #ifdef CERTIROCQ_DEBUG_GC
       fprintf(stderr, "Generation %d:  ", i);
       #endif
       do_generation(h->spaces+i, h->spaces+(i+1), ti->fp);
@@ -519,7 +519,7 @@ void *export_heap(struct thread_info *ti, value root) {
 }
 
 /* mutable write barrier */
-void certicoq_modify(struct thread_info *ti, value *p_cell, value p_val) {
+void certirocq_modify(struct thread_info *ti, value *p_cell, value p_val) {
   assert (ti->alloc < ti->limit);
   *p_cell = p_val;
   if (is_ptr(p_val)) {
@@ -550,5 +550,18 @@ void print_heapsize(struct thread_info *ti) {
  might be similar in size to the entire address space. 
 */
 
-    
-    
+struct closure {
+  value (*func)(struct thread_info *, value, value);
+  value env;
+};
+
+value closure_call(struct thread_info *$tinfo, value $clo, value $arg)
+{
+  register value (*$f)(struct thread_info*, value, value);
+  register value $envi;
+  register value $tmp;
+  $f = (*((struct closure *) $clo)).func;
+  $envi = (*((struct closure *) $clo)).env;
+  $tmp = $f($tinfo, $envi, $arg);
+  return $tmp;
+}

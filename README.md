@@ -1,25 +1,25 @@
-# CertiCoq
+# CertiRocq
 
 <p align="center">
-<img src="https://certicoq.org/certicoq.png" alt="CertiCoqCoq" width="100px"/>
+<img width="500" alt="CERTIROCQ_LOGO-logo-1" src="https://github.com/user-attachments/assets/bf3e20f3-7632-4e39-8dea-5871f28971cf" />
 </p>
 
 ## Overview
 
-[![build](https://github.com/CertiCoq/certicoq/actions/workflows/build.yml/badge.svg)](https://github.com/CertiCoq/certicoq/actions/workflows/build.yml)
+[![build](https://github.com/CertiRocq/certirocq/actions/workflows/build.yml/badge.svg)](https://github.com/CertiRocq/certirocq/actions/workflows/build.yml)
 
-![GitHub](https://img.shields.io/github/license/CertiCoq/certicoq)
+![GitHub](https://img.shields.io/github/license/CertiRocq/certirocq)
 
 
-CertiCoq is a compiler for Gallina, the specification language of the [Coq proof assistant](https://coq.inria.fr/refman/index.html). CertiCoq targets Clight, a subset of the C language that can be compiled with any C compiler, including the [CompCert](http://compcert.org) verified compiler.
+CertiRocq is a compiler for Gallina, the specification language of the [Rocq Prover](https://rocq-prover.org). CertiRocq targets WebAssembly and Clight, a subset of the C language that can be compiled with any C compiler, including the [CompCert](http://compcert.org) verified compiler.
 
-Large parts of the CertiCoq compiler have been verified whereas others are in the process of being verified.
+Large parts of the CertiRocq compiler have been verified whereas others are in the process of being verified.
 
 ## Documentation
 
-The [CertiCoq Wiki](https://github.com/PrincetonUniversity/certicoq/wiki) has instructions for using the [CertiCoq plugin](https://github.com/PrincetonUniversity/certicoq/wiki/The-CertiCoq-plugin) to compile Gallina to C and interfacing with the generated C code.
+The [CertiRocq Wiki](https://github.com/PrincetonUniversity/certirocq/wiki) has instructions for using the [CertiRocq plugin](https://github.com/PrincetonUniversity/certirocq/wiki/The-CertiRocq-plugin) to compile Gallina to C and interfacing with the generated C code.
 
-You can also find some demos [here](https://github.com/PrincetonUniversity/certicoq/blob/master/benchmarks/tests.v) and [here](https://github.com/PrincetonUniversity/certicoq/blob/master/benchmarks/axioms/tests.v).
+You can also find some demos [here](https://github.com/CertiRocq/certirocq/blob/master/benchmarks/tests.v) and [here](https://github.com/CertiRocq/certirocq/blob/master/benchmarks/axioms/tests.v).
 
 ## Installation Instructions
 
@@ -27,30 +27,30 @@ See [INSTALL.md](INSTALL.md)  for installation instructions.
 
 ## Current Members
 
-Andrew Appel, Yannick Forster, Joomy Korkut, Zoe Paraskevopoulou, and Matthieu Sozeau.
+Yannick Forster, Joomy Korkut, Zoe Paraskevopoulou, and Matthieu Sozeau.
 
 ## Past Members and Contributors
 
-Abhishek Anand, Anvay Grover, John Li, Greg Morrisett, Randy Pollack, Olivier Savary Belanger, Matthew Weaver
+Andrew Appel, Abhishek Anand, Anvay Grover, John Li, Greg Morrisett, Randy Pollack, Olivier Savary Belanger, Matthew Weaver
 
-## License 
+## License
 
-CertiCoq is open source and distributed under the [MIT license](LICENSE.md).
+CertiRocq is open source and distributed under the [MIT license](LICENSE.md).
 
 ## Directory structure
 
 * `theories/` contains the sources of the compiler
-* `plugin/` contains the CertiCoq plugin for Coq 
+* `plugin/` contains the CertiRocq plugin for Rocq
 * `benchmarks/` contains the benchmark suite
 * `glue/` contains the glue code generator
-* `bootstrap/` contains the bootstrapped CertiCoq plugin for Coq and
-  a CertiCoq-compiled variant of MetaCoq's safe type checker.
+* `bootstrap/` contains the bootstrapped CertiRocq plugin for Rocq and
+  a CertiRocq-compiled variant of MetaRocq's safe type checker.
 
 Structure of the theories directory:
 
 * `theories/common`: contains common code utilities 
-* `theories/Compiler`: contains the toplevel CertiCoq pipeline 
-* `theories/LambdaBoxMut`: mutual inductive version of MetaCoq's LambdaBox erased language
+* `theories/Compiler`: contains the toplevel CertiRocq pipeline
+* `theories/LambdaBoxMut`: mutual inductive version of MetaRocq's LambdaBox erased language
 * `theories/LambdaBoxLocal`: variant where deBruijn indices are represented using `N` instead of `nat`.
    The transformation from LambdaBoxMut let-binds the definitions in the environment to
    produce a closed term.
@@ -61,4 +61,4 @@ Structure of the theories directory:
 
 ## Bugs 
 
-We use github's [issue tracker](https://github.com/PrincetonUniversity/certicoq/issues) to keep track of bugs and feature requests.
+We use github's [issue tracker](https://github.com/CertiRocq/certirocq/issues) to keep track of bugs and feature requests.

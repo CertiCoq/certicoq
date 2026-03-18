@@ -6,9 +6,9 @@
 
 extern void body(struct thread_info *);
 
-extern void print_Coq_Numbers_BinNums_Z(unsigned long long);
+extern void print_Corelib_Numbers_BinNums_Z(unsigned long long);
 
-extern void print_Coq_Init_Datatypes_prod(unsigned long long, void (*)(unsigned long long), void (*)(unsigned long long));
+extern void print_Corelib_Init_Datatypes_prod(unsigned long long, void (*)(unsigned long long), void (*)(unsigned long long));
 
 extern value args[];
 
@@ -21,7 +21,7 @@ int main(int argc, char *argv[]) {
   struct thread_info* tinfo;
   clock_t start, end;
   double msec, sec;
-  
+
   // Specify number of runs
   int n = 1;
   if (argc > 1) n = atoi(argv[1]);
@@ -36,7 +36,7 @@ int main(int argc, char *argv[]) {
 
   val = tinfo -> args[1];
   // TODO : fold over nat to print the C int
-  print_Coq_Init_Datatypes_prod(val, print_Coq_Numbers_BinNums_Z, print_Coq_Numbers_BinNums_Z);
+  print_Corelib_Init_Datatypes_prod(val, print_Corelib_Numbers_BinNums_Z, print_Corelib_Numbers_BinNums_Z);
   printf("\n");
 
   sec = (double)(end - start)/CLOCKS_PER_SEC;

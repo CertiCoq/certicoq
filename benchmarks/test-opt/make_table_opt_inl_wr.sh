@@ -10,7 +10,7 @@ N=$1
 
 # Compare inlining all known calls vs. inline defensively (to not increase closure environments)
 
-echo "Running CertiCoq programs..."
+echo "Running CertiRocq programs..."
 printf "      & ANF OPT DEF & ANF OPT AGR & SPEEDUP & CPS OPT DEF & CPS OPT AGR & SPEEDUP \n"
 
 for f in $FILES

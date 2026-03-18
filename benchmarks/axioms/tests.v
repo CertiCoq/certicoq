@@ -1,9 +1,9 @@
-From CertiCoq.Plugin Require Import CertiCoq.
+From CertiRocq.Plugin Require Import CertiRocq.
 
-Require Import Arith PArith List String Ascii.
+From Stdlib Require Import Arith PArith List String Ascii.
 Require Import ExtLib.Data.String.
 
-Import ListNotations. 
+Import ListNotations.
 
 (* Example 1: printing axioms *)
 
@@ -29,7 +29,7 @@ Definition print_list (l : list nat) : unit :=
 
 Definition print_lst := print_list [1;2;3;4;5].
 
-CertiCoq Compile print_lst
+CertiRocq Compile print_lst
 Extract Constants [ print_nat => "print_gallina_nat", print_str => "print_gallina_string", new_line => "print_new_line" ]
 Include [ "print.h" ].
 
@@ -59,7 +59,7 @@ Definition fibn : unit :=
   let _ := print_int63 (fib 11) in
   new_line tt.
 
-CertiCoq Compile fibn
+CertiRocq Compile fibn
 Extract Constants [ add_int63 => "add_int63", zero_int63 => "zero_int63", one_int63 => "one_int63", print_int63 => "print_int63", new_line => "print_new_line" ]
 Include [ "int63.h" ].
 
@@ -71,17 +71,17 @@ Definition list_sum_int63 :=
   let _ := print_int63 n in new_line tt.
 
 
-CertiCoq Compile list_sum_int63
+CertiRocq Compile list_sum_int63
 Extract Constants [ add_int63 => "add_int63", zero_int63 => "zero_int63", one_int63 => "one_int63", print_int63 => "print_int63", new_line => "print_new_line" ]
 Include [ "int63.h" ].
 
 
-(* "Dummy" example with tinfo (tifno is not used by the C function) *) 
+(* "Dummy" example with tinfo (tifno is not used by the C function) *)
 
 Definition list_sum_int63_tinfo :=
   let n := List.fold_left add_int63 (List.repeat one_int63 100) zero_int63 in
   let _ := print_int63 n in new_line tt.
 
-CertiCoq Compile list_sum_int63_tinfo
+CertiRocq Compile list_sum_int63_tinfo
 Extract Constants [ add_int63 => "add_int63" with tinfo, zero_int63 => "zero_int63", one_int63 => "one_int63", print_int63 => "print_int63" with tinfo, new_line => "print_new_line" ]
 Include [ "int63_tinfo.h" ].

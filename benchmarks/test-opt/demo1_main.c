@@ -6,9 +6,9 @@
 
 extern void body(struct thread_info *);
 
-extern void print_Coq_Init_Datatypes_list(unsigned long long, void (*)(unsigned long long));
+extern void print_Corelib_Init_Datatypes_list(unsigned long long, void (*)(unsigned long long));
 
-extern void print_Coq_Init_Datatypes_bool(unsigned long long);
+extern void print_Corelib_Init_Datatypes_bool(unsigned long long);
 
 extern value args[];
 
@@ -35,7 +35,7 @@ int main(int argc, char *argv[]) {
   end = clock();
 
   val = tinfo -> args[1];
-  print_Coq_Init_Datatypes_list(val, print_Coq_Init_Datatypes_bool);
+  print_Corelib_Init_Datatypes_list(val, print_Corelib_Init_Datatypes_bool);
   printf("\n");
 
   sec = (double)(end - start)/CLOCKS_PER_SEC;

@@ -21,7 +21,7 @@ make install
 cd ..
 
 cd metacoq
-echo "Rebuilding MetaCoq"
+echo "Rebuilding MetaRocq"
 clean
 ./configure.sh local
 make -j 2 translations all

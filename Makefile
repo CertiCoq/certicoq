@@ -17,21 +17,21 @@ submodules:
 
 plugins: plugin cplugin
 
-plugin: all runtime plugin/CertiCoq.vo
+plugin: all runtime plugin/CertiRocq.vo
 
 plugin/Makefile: plugin/_CoqProject
 	cd plugin ; coq_makefile -f _CoqProject -o Makefile
 
-plugin/CertiCoq.vo: all plugin/Makefile theories/Extraction/extraction.vo
+plugin/CertiRocq.vo: all plugin/Makefile theories/Extraction/extraction.vo
 	bash ./make_plugin.sh plugin
 
 
-cplugin: all runtime cplugin/CertiCoq.vo
+cplugin: all runtime cplugin/CertiRocq.vo
 
 cplugin/Makefile: cplugin/_CoqProject
 	cd cplugin ; coq_makefile -f _CoqProject -o Makefile
 
-cplugin/CertiCoq.vo: all cplugin/Makefile theories/ExtractionVanilla/extraction.vo
+cplugin/CertiRocq.vo: all cplugin/Makefile theories/ExtractionVanilla/extraction.vo
 	bash ./make_plugin.sh cplugin
 
 bootstrap: plugin cplugin

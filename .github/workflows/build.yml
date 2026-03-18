@@ -16,27 +16,21 @@ jobs:
     strategy:
       matrix:
         opam_file:
-          - 'coq-certicoq.opam'
+          - 'rocq-certirocq.opam'
         image:
-          - 'mattam82/metacoq:metacoq-1.3.4-coq-8.20'
+          - 'mattam82/metacoq:metarocq-1.5.1-rocq-9.1'
       fail-fast: false  # don't stop jobs if one fails
     steps:
       - uses: actions/checkout@v3
         with:
-           submodules: true
+           submodules: false
       - uses: coq-community/docker-coq-action@v1
         with:
           custom_image: ${{ matrix.image }}
           opam_file: ${{ matrix.opam_file }}
-          before_install: | # comment back in if MetaCoq commit changes
+          before_install: | # comment back in if MetaRocq commit changes
             startGroup "fix permission issues"
-              sudo chown -R coq:coq .
-            endGroup
-
-            startGroup "opam pin"
-              # TODO: this should be done in the Dockerfile
-              opam pin add coq-compcert 3.14 -y
-            #   opam pin -n -y submodules/metacoq
+              sudo chown -R 1000:1000 .
             endGroup
           before_script: |
             startGroup "Install more dependencies"
@@ -50,7 +44,7 @@ jobs:
               node --version
             endGroup
             startGroup "fix permission issues"
-              sudo chown -R coq:coq .
+              sudo chown -R 1000:1000 .
             endGroup
             startGroup "Copy repo (for later benchmarking)"
               cp -r `pwd` ~/repo

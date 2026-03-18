@@ -1,10 +1,10 @@
-Require Import Arith List String.
-Require Import CertiCoq.Benchmarks.lib.vs.
-Require Import CertiCoq.Benchmarks.lib.Binom.
-Require Import CertiCoq.Benchmarks.lib.Color.
-Require Import CertiCoq.Benchmarks.lib.sha256.
+From Stdlib Require Import Arith List String.
+Require Import CertiRocq.Benchmarks.lib.vs.
+Require Import CertiRocq.Benchmarks.lib.Binom.
+Require Import CertiRocq.Benchmarks.lib.Color.
+Require Import CertiRocq.Benchmarks.lib.sha256.
 
-From CertiCoq.Plugin Require Import CertiCoq.
+From CertiRocq.Plugin Require Import CertiRocq.
 
 Open Scope string.
 
@@ -65,175 +65,175 @@ Definition sha := sha256.SHA_256 (sha256.str_to_bytes test).
 Definition sha_fast := sha256.SHA_256' (sha256.str_to_bytes test).
 
 
-(* CertiCoq Show IR -time_anf vs_easy. *)
-(* CertiCoq Show IR -time_anf -O 1 -ext "_optc0" vs_easy. *)
-(* CertiCoq Show IR -config 2 -time_anf -ext "_inl" vs_easy. *)
-(* CertiCoq Show IR -config 2 -O 1 -time_anf -ext "_opt_no_inl" vs_easy. *)
+(* CertiRocq Show IR -time_anf vs_easy. *)
+(* CertiRocq Show IR -time_anf -O 1 -ext "_optc0" vs_easy. *)
+(* CertiRocq Show IR -config 2 -time_anf -ext "_inl" vs_easy. *)
+(* CertiRocq Show IR -config 2 -O 1 -time_anf -ext "_opt_no_inl" vs_easy. *)
 
 Eval compute in "Compiling demo1".
 
-CertiCoq Compile -O 1 -ext "_cps_opt" demo1.
-CertiCoq Compile -O 1 -ext "_opt" demo1.
+CertiRocq Compile -O 1 -ext "_cps_opt" demo1.
+CertiRocq Compile -O 1 -ext "_opt" demo1.
 
-CertiCoq Compile -config 1 -O 1 -ext "_cps_opt1" demo1.
-CertiCoq Compile -config 1 -O 1 -ext "_opt1" demo1.
+CertiRocq Compile -config 1 -O 1 -ext "_cps_opt1" demo1.
+CertiRocq Compile -config 1 -O 1 -ext "_opt1" demo1.
 
-CertiCoq Compile -config 2 -O 1 -ext "_cps_opt2" demo1.
-CertiCoq Compile -config 2 -O 1 -ext "_opt2" demo1.
+CertiRocq Compile -config 2 -O 1 -ext "_cps_opt2" demo1.
+CertiRocq Compile -config 2 -O 1 -ext "_opt2" demo1.
 
-CertiCoq Compile -config 3 -O 1 -ext "_cps_opt3" demo1.
-CertiCoq Compile -config 3 -O 1 -ext "_opt3" demo1.
+CertiRocq Compile -config 3 -O 1 -ext "_cps_opt3" demo1.
+CertiRocq Compile -config 3 -O 1 -ext "_opt3" demo1.
 
-CertiCoq Compile -config 4 -O 1 -ext "_cps_opt4" demo1.
-CertiCoq Compile -config 4 -O 1 -ext "_opt4" demo1.
+CertiRocq Compile -config 4 -O 1 -ext "_cps_opt4" demo1.
+CertiRocq Compile -config 4 -O 1 -ext "_opt4" demo1.
 
-CertiCoq Compile -config 5 -O 1 -ext "_cps_opt5" demo1.
-CertiCoq Compile -config 5 -O 1 -ext "_opt5" demo1.
+CertiRocq Compile -config 5 -O 1 -ext "_cps_opt5" demo1.
+CertiRocq Compile -config 5 -O 1 -ext "_opt5" demo1.
 
 Eval compute in "Compiling demo2".
 
-CertiCoq Compile -O 1 -ext "_cps_opt" demo2.
-CertiCoq Compile -O 1 -ext "_opt" demo2.
+CertiRocq Compile -O 1 -ext "_cps_opt" demo2.
+CertiRocq Compile -O 1 -ext "_opt" demo2.
 
-CertiCoq Compile -config 1 -O 1 -ext "_cps_opt1" demo2.
-CertiCoq Compile -config 1 -O 1 -ext "_opt1" demo2.
+CertiRocq Compile -config 1 -O 1 -ext "_cps_opt1" demo2.
+CertiRocq Compile -config 1 -O 1 -ext "_opt1" demo2.
 
-CertiCoq Compile -config 2 -O 1 -ext "_cps_opt2" demo2.
-CertiCoq Compile -config 2 -O 1 -ext "_opt2" demo2.
+CertiRocq Compile -config 2 -O 1 -ext "_cps_opt2" demo2.
+CertiRocq Compile -config 2 -O 1 -ext "_opt2" demo2.
 
-CertiCoq Compile -config 3 -O 1 -ext "_cps_opt3" demo2.
-CertiCoq Compile -config 3 -O 1 -ext "_opt3" demo2.
+CertiRocq Compile -config 3 -O 1 -ext "_cps_opt3" demo2.
+CertiRocq Compile -config 3 -O 1 -ext "_opt3" demo2.
 
-CertiCoq Compile -config 4 -O 1 -ext "_cps_opt4" demo2.
-CertiCoq Compile -config 4 -O 1 -ext "_opt4" demo2.
+CertiRocq Compile -config 4 -O 1 -ext "_cps_opt4" demo2.
+CertiRocq Compile -config 4 -O 1 -ext "_opt4" demo2.
 
-CertiCoq Compile -config 5 -O 1 -ext "_cps_opt5" demo2.
-CertiCoq Compile -config 5 -O 1 -ext "_opt5" demo2.
+CertiRocq Compile -config 5 -O 1 -ext "_cps_opt5" demo2.
+CertiRocq Compile -config 5 -O 1 -ext "_opt5" demo2.
 
 Eval compute in "Compiling list_sum".
 
-CertiCoq Compile -O 1 -ext "_cps_opt" list_sum.
-CertiCoq Compile -O 1 -ext "_opt" list_sum.
+CertiRocq Compile -O 1 -ext "_cps_opt" list_sum.
+CertiRocq Compile -O 1 -ext "_opt" list_sum.
 
-CertiCoq Compile -config 1 -O 1 -ext "_cps_opt1" list_sum.
-CertiCoq Compile -config 1 -O 1 -ext "_opt1" list_sum.
+CertiRocq Compile -config 1 -O 1 -ext "_cps_opt1" list_sum.
+CertiRocq Compile -config 1 -O 1 -ext "_opt1" list_sum.
 
-CertiCoq Compile -config 2 -O 1 -ext "_cps_opt2" list_sum.
-CertiCoq Compile -config 2 -O 1 -ext "_opt2" list_sum.
+CertiRocq Compile -config 2 -O 1 -ext "_cps_opt2" list_sum.
+CertiRocq Compile -config 2 -O 1 -ext "_opt2" list_sum.
 
-CertiCoq Compile -config 3 -O 1 -ext "_cps_opt3" list_sum.
-CertiCoq Compile -config 3 -O 1 -ext "_opt3" list_sum.
+CertiRocq Compile -config 3 -O 1 -ext "_cps_opt3" list_sum.
+CertiRocq Compile -config 3 -O 1 -ext "_opt3" list_sum.
 
-CertiCoq Compile -config 4 -O 1 -ext "_cps_opt4" list_sum.
-CertiCoq Compile -config 4 -O 1 -ext "_opt4" list_sum.
+CertiRocq Compile -config 4 -O 1 -ext "_cps_opt4" list_sum.
+CertiRocq Compile -config 4 -O 1 -ext "_opt4" list_sum.
 
-CertiCoq Compile -config 5 -O 1 -ext "_cps_opt5" list_sum.
-CertiCoq Compile -config 5 -O 1 -ext "_opt5" list_sum.
+CertiRocq Compile -config 5 -O 1 -ext "_cps_opt5" list_sum.
+CertiRocq Compile -config 5 -O 1 -ext "_opt5" list_sum.
 
 
 Eval compute in "Compiling vs_easy".
 
-CertiCoq Compile -O 1 -ext "_cps_opt" vs_easy.
-CertiCoq Compile -O 1 -ext "_opt" vs_easy.
+CertiRocq Compile -O 1 -ext "_cps_opt" vs_easy.
+CertiRocq Compile -O 1 -ext "_opt" vs_easy.
 
-CertiCoq Compile -config 1 -O 1 -ext "_cps_opt1" vs_easy.
-CertiCoq Compile -config 1 -O 1 -ext "_opt1" vs_easy.
+CertiRocq Compile -config 1 -O 1 -ext "_cps_opt1" vs_easy.
+CertiRocq Compile -config 1 -O 1 -ext "_opt1" vs_easy.
 
-CertiCoq Compile -config 2 -O 1 -ext "_cps_opt2" vs_easy.
-CertiCoq Compile -config 2 -O 1 -ext "_opt2" vs_easy.
+CertiRocq Compile -config 2 -O 1 -ext "_cps_opt2" vs_easy.
+CertiRocq Compile -config 2 -O 1 -ext "_opt2" vs_easy.
 
-CertiCoq Compile -config 3 -O 1 -ext "_cps_opt3" vs_easy.
-CertiCoq Compile -config 3 -O 1 -ext "_opt3" vs_easy.
+CertiRocq Compile -config 3 -O 1 -ext "_cps_opt3" vs_easy.
+CertiRocq Compile -config 3 -O 1 -ext "_opt3" vs_easy.
 
-CertiCoq Compile -config 4 -O 1 -ext "_cps_opt4" vs_easy.
-CertiCoq Compile -config 4 -O 1 -ext "_opt4" vs_easy.
+CertiRocq Compile -config 4 -O 1 -ext "_cps_opt4" vs_easy.
+CertiRocq Compile -config 4 -O 1 -ext "_opt4" vs_easy.
 
-CertiCoq Compile -config 5 -O 1 -ext "_cps_opt5" vs_easy.
-CertiCoq Compile -config 5 -O 1 -ext "_opt5" vs_easy.
+CertiRocq Compile -config 5 -O 1 -ext "_cps_opt5" vs_easy.
+CertiRocq Compile -config 5 -O 1 -ext "_opt5" vs_easy.
 
 Eval compute in "Compiling vs_hard".
 
-CertiCoq Compile -O 1 -ext "_cps_opt" vs_hard.
-CertiCoq Compile -O 1 -ext "_opt" vs_hard.
+CertiRocq Compile -O 1 -ext "_cps_opt" vs_hard.
+CertiRocq Compile -O 1 -ext "_opt" vs_hard.
 
-CertiCoq Compile -config 1 -O 1 -ext "_cps_opt1" vs_hard.
-CertiCoq Compile -config 1 -O 1 -ext "_opt1" vs_hard.
+CertiRocq Compile -config 1 -O 1 -ext "_cps_opt1" vs_hard.
+CertiRocq Compile -config 1 -O 1 -ext "_opt1" vs_hard.
 
-CertiCoq Compile -config 2 -O 1 -ext "_cps_opt2" vs_hard.
-CertiCoq Compile -config 2 -O 1 -ext "_opt2" vs_hard.
+CertiRocq Compile -config 2 -O 1 -ext "_cps_opt2" vs_hard.
+CertiRocq Compile -config 2 -O 1 -ext "_opt2" vs_hard.
 
-CertiCoq Compile -config 3 -O 1 -ext "_cps_opt3" vs_hard.
-CertiCoq Compile -config 3 -O 1 -ext "_opt3" vs_hard.
+CertiRocq Compile -config 3 -O 1 -ext "_cps_opt3" vs_hard.
+CertiRocq Compile -config 3 -O 1 -ext "_opt3" vs_hard.
 
-CertiCoq Compile -config 4 -O 1 -ext "_cps_opt4" vs_hard.
-CertiCoq Compile -config 4 -O 1 -ext "_opt4" vs_hard.
+CertiRocq Compile -config 4 -O 1 -ext "_cps_opt4" vs_hard.
+CertiRocq Compile -config 4 -O 1 -ext "_opt4" vs_hard.
 
-CertiCoq Compile -config 5 -O 1 -ext "_cps_opt5" vs_hard.
-CertiCoq Compile -config 5 -O 1 -ext "_opt5" vs_hard.
+CertiRocq Compile -config 5 -O 1 -ext "_cps_opt5" vs_hard.
+CertiRocq Compile -config 5 -O 1 -ext "_opt5" vs_hard.
 
 
 Eval compute in "Compiling binom".
 
-CertiCoq Compile -O 1 -ext "_cps_opt" binom.
-CertiCoq Compile -O 1 -ext "_opt" binom.
+CertiRocq Compile -O 1 -ext "_cps_opt" binom.
+CertiRocq Compile -O 1 -ext "_opt" binom.
 
-CertiCoq Compile -config 1 -O 1 -ext "_cps_opt1" binom.
-CertiCoq Compile -config 1 -O 1 -ext "_opt1" binom.
+CertiRocq Compile -config 1 -O 1 -ext "_cps_opt1" binom.
+CertiRocq Compile -config 1 -O 1 -ext "_opt1" binom.
 
-CertiCoq Compile -config 2 -O 1 -ext "_cps_opt2" binom.
-CertiCoq Compile -config 2 -O 1 -ext "_opt2" binom.
+CertiRocq Compile -config 2 -O 1 -ext "_cps_opt2" binom.
+CertiRocq Compile -config 2 -O 1 -ext "_opt2" binom.
 
-CertiCoq Compile -config 3 -O 1 -ext "_cps_opt3" binom.
-CertiCoq Compile -config 3 -O 1 -ext "_opt3" binom.
+CertiRocq Compile -config 3 -O 1 -ext "_cps_opt3" binom.
+CertiRocq Compile -config 3 -O 1 -ext "_opt3" binom.
 
-CertiCoq Compile -config 4 -O 1 -ext "_cps_opt4" binom.
-CertiCoq Compile -config 4 -O 1 -ext "_opt4" binom.
+CertiRocq Compile -config 4 -O 1 -ext "_cps_opt4" binom.
+CertiRocq Compile -config 4 -O 1 -ext "_opt4" binom.
 
-CertiCoq Compile -config 5 -O 1 -ext "_cps_opt5" binom.
-CertiCoq Compile -config 5 -O 1 -ext "_opt5" binom.
+CertiRocq Compile -config 5 -O 1 -ext "_cps_opt5" binom.
+CertiRocq Compile -config 5 -O 1 -ext "_opt5" binom.
 
 Eval compute in "Compiling color".
 
-CertiCoq Compile -O 1 -ext "_cps_opt" color.
-CertiCoq Compile -O 1 -ext "_opt" color.
+CertiRocq Compile -O 1 -ext "_cps_opt" color.
+CertiRocq Compile -O 1 -ext "_opt" color.
 
-CertiCoq Compile -config 1 -O 1 -ext "_cps_opt1" color.
-CertiCoq Compile -config 1 -O 1 -ext "_opt1" color.
+CertiRocq Compile -config 1 -O 1 -ext "_cps_opt1" color.
+CertiRocq Compile -config 1 -O 1 -ext "_opt1" color.
 
-CertiCoq Compile -config 2 -O 1 -ext "_cps_opt2" color.
-CertiCoq Compile -config 2 -O 1 -ext "_opt2" color.
+CertiRocq Compile -config 2 -O 1 -ext "_cps_opt2" color.
+CertiRocq Compile -config 2 -O 1 -ext "_opt2" color.
 
-CertiCoq Compile -config 3 -O 1 -ext "_cps_opt3" color.
-CertiCoq Compile -config 3 -O 1 -ext "_opt3" color.
+CertiRocq Compile -config 3 -O 1 -ext "_cps_opt3" color.
+CertiRocq Compile -config 3 -O 1 -ext "_opt3" color.
 
-CertiCoq Compile -config 4 -O 1 -ext "_cps_opt4" color.
-CertiCoq Compile -config 4 -O 1 -ext "_opt4" color.
+CertiRocq Compile -config 4 -O 1 -ext "_cps_opt4" color.
+CertiRocq Compile -config 4 -O 1 -ext "_opt4" color.
 
-CertiCoq Compile -config 5 -O 1 -ext "_cps_opt5" color.
-CertiCoq Compile -config 5 -O 1 -ext "_opt5" color.
+CertiRocq Compile -config 5 -O 1 -ext "_cps_opt5" color.
+CertiRocq Compile -config 5 -O 1 -ext "_opt5" color.
 
 Eval compute in "Compiling sha_fast".
 
-CertiCoq Compile -O 1 -ext "_cps_opt" sha_fast.
-CertiCoq Compile -O 1 -ext "_opt" sha_fast.
+CertiRocq Compile -O 1 -ext "_cps_opt" sha_fast.
+CertiRocq Compile -O 1 -ext "_opt" sha_fast.
 
-CertiCoq Compile -config 1 -O 1 -ext "_cps_opt1" sha_fast.
-CertiCoq Compile -config 1 -O 1 -ext "_opt1" sha_fast.
+CertiRocq Compile -config 1 -O 1 -ext "_cps_opt1" sha_fast.
+CertiRocq Compile -config 1 -O 1 -ext "_opt1" sha_fast.
 
-CertiCoq Compile -config 2 -O 1 -ext "_cps_opt2" sha_fast.
-CertiCoq Compile -config 2 -O 1 -ext "_opt2" sha_fast.
+CertiRocq Compile -config 2 -O 1 -ext "_cps_opt2" sha_fast.
+CertiRocq Compile -config 2 -O 1 -ext "_opt2" sha_fast.
 
-CertiCoq Compile -config 3 -O 1 -ext "_cps_opt3" sha_fast.
-CertiCoq Compile -config 3 -O 1 -ext "_opt3" sha_fast.
+CertiRocq Compile -config 3 -O 1 -ext "_cps_opt3" sha_fast.
+CertiRocq Compile -config 3 -O 1 -ext "_opt3" sha_fast.
 
-CertiCoq Compile -config 4 -O 1 -ext "_cps_opt4" sha_fast.
-CertiCoq Compile -config 4 -O 1 -ext "_opt4" sha_fast.
+CertiRocq Compile -config 4 -O 1 -ext "_cps_opt4" sha_fast.
+CertiRocq Compile -config 4 -O 1 -ext "_opt4" sha_fast.
 
-CertiCoq Compile -config 5 -O 1 -ext "_cps_opt5" sha_fast.
-CertiCoq Compile -config 5 -O 1 -ext "_opt5" sha_fast.
+CertiRocq Compile -config 5 -O 1 -ext "_cps_opt5" sha_fast.
+CertiRocq Compile -config 5 -O 1 -ext "_opt5" sha_fast.
 
 
-(* OLD 
+(* OLD
 
 Fixpoint even (n : nat) : bool :=
   match n with
@@ -242,7 +242,7 @@ Fixpoint even (n : nat) : bool :=
   end
 with
 odd (n : nat) : bool :=
-  let del (x : nat) := x in 
+  let del (x : nat) := x in
   match n with
   | 0 => false
   | S n' => even n'
@@ -251,11 +251,11 @@ odd (n : nat) : bool :=
 
 Definition filter_odd := List.app (filter even (seq 0 2)) (filter odd (seq 0 2)).
 
-CertiCoq Show IR -anf -debug filter_odd. 
-CertiCoq Compile -ext "_cps" filter_odd.
-CertiCoq Compile -o1 -ext "_cps_opt" filter_odd.
-CertiCoq Compile -anf filter_odd.
-CertiCoq Compile -anf -o1 -ext "_opt" filter_odd.
+CertiRocq Show IR -anf -debug filter_odd.
+CertiRocq Compile -ext "_cps" filter_odd.
+CertiRocq Compile -o1 -ext "_cps_opt" filter_odd.
+CertiRocq Compile -anf filter_odd.
+CertiRocq Compile -anf -o1 -ext "_opt" filter_odd.
 
 Definition repeat {A} (x : A) (n : nat) : list A :=
   (fix rep (x : A) (n : nat) acc :=
@@ -267,10 +267,10 @@ Definition repeat {A} (x : A) (n : nat) : list A :=
 
 Definition list_sum := List.fold_left plus (repeat 10 (100)) 0.
 
-CertiCoq Compile -ext "_cps" list_sum.
-CertiCoq Compile -o1 -ext "_cps_opt" list_sum.
-CertiCoq Compile -anf list_sum.
-CertiCoq Compile -anf -o1 -ext "_opt" list_sum.
+CertiRocq Compile -ext "_cps" list_sum.
+CertiRocq Compile -o1 -ext "_cps_opt" list_sum.
+CertiRocq Compile -anf list_sum.
+CertiRocq Compile -anf -o1 -ext "_opt" list_sum.
 
 Fixpoint loop_add n (f : Datatypes.unit -> nat) : nat :=
   match n with
@@ -307,56 +307,56 @@ Definition clos_loop (u : unit) : nat :=
 
 Definition clos := loop_add 1 clos_loop.
 
-CertiCoq Compile -ext "_cps" clos.
-CertiCoq Compile -o1 -ext "_cps_opt" clos.
-CertiCoq Compile -anf clos.
-CertiCoq Compile -anf -o1 -ext "_opt" clos.
-(* CertiCoq Show IR -debug clos. *)
+CertiRocq Compile -ext "_cps" clos.
+CertiRocq Compile -o1 -ext "_cps_opt" clos.
+CertiRocq Compile -anf clos.
+CertiRocq Compile -anf -o1 -ext "_opt" clos.
+(* CertiRocq Show IR -debug clos. *)
 
-(* CertiCoq Show IR -anf -debug clos. *)
-(* CertiCoq Show IR -anf -debug -o1 -ext "_opt" clos. *)
+(* CertiRocq Show IR -anf -debug clos. *)
+(* CertiRocq Show IR -anf -debug -o1 -ext "_opt" clos. *)
 
 
-Definition addxy (x y w : nat) (l : list nat) := 
+Definition addxy (x y w : nat) (l : list nat) :=
   let f := (fix aux l :=
      match l with
      | [] => []
      | z :: zs => (z + x + y + w) :: aux zs
      end) in
-  f l. 
+  f l.
 
 Definition rec_clos := addxy 1 2 3 (List.repeat 0 (100*500)).
 
-CertiCoq Compile -ext "_cps" rec_clos.
-CertiCoq Compile -o1 -ext "_cps_opt" rec_clos.
-CertiCoq Compile -anf rec_clos.
-CertiCoq Compile -anf -o1 -ext "_opt" rec_clos.
+CertiRocq Compile -ext "_cps" rec_clos.
+CertiRocq Compile -o1 -ext "_cps_opt" rec_clos.
+CertiRocq Compile -anf rec_clos.
+CertiRocq Compile -anf -o1 -ext "_opt" rec_clos.
 
 
-Definition intxy (x y w : nat) (l : list nat):= 
+Definition intxy (x y w : nat) (l : list nat):=
   let f := (fix aux l acc :=
      match l with
-     | [] => acc  
+     | [] => acc
      | z :: zs => aux zs (z :: x :: y :: w :: acc)
      end) in
   f l [].
 
-Definition intxy' (x y w : nat) (l : list nat) := 
+Definition intxy' (x y w : nat) (l : list nat) :=
   let f := (fix aux l :=
      match l with
-     | [] => []  
+     | [] => []
      | z :: zs => z :: x :: y :: w :: aux zs
      end) in
   f l.
 
 Definition rec_clos2 := intxy 1 2 3 (repeat 0 (100*500)).
 
-CertiCoq Compile -ext "_cps" rec_clos2.
-CertiCoq Compile -o1 -ext "_cps_opt" rec_clos2.
-CertiCoq Compile -anf rec_clos2.
-CertiCoq Compile -anf -o1 -ext "_opt" rec_clos2.
-CertiCoq Show IR -anf rec_clos2.
-CertiCoq Show IR -anf -o1 -ext "_opt" rec_clos2.
+CertiRocq Compile -ext "_cps" rec_clos2.
+CertiRocq Compile -o1 -ext "_cps_opt" rec_clos2.
+CertiRocq Compile -anf rec_clos2.
+CertiRocq Compile -anf -o1 -ext "_opt" rec_clos2.
+CertiRocq Show IR -anf rec_clos2.
+CertiRocq Show IR -anf -o1 -ext "_opt" rec_clos2.
 
 
 (* Fixpoint ack (m : nat) := *)
@@ -394,37 +394,37 @@ Valid options:
 -anf    : to use direct-style compilation
 -time   : to time phases
 -o1     : to use optimizing pipeline
--debug  : to print debug messages 
+-debug  : to print debug messages
 -args X : to use X arguments in the C generated code (+1 for the thread_info)
 
 
 To print the backend IR (aka LambdaANF) you can use the command
-CertiCoq Show IR <global_id>.
+CertiRocq Show IR <global_id>.
 *)
 
-(* 
+(*
 Definition demo1 := List.app (List.repeat true 5) (List.repeat false 3).
 Definition demo2 := List.map negb [true; false; true].
-Definition demo3 := andb. 
- 
-CertiCoq Compile -ext "_cps" demo1.
-CertiCoq Compile -anf demo1.
-CertiCoq Compile -anf -o1 -ext "_opt" demo1.
+Definition demo3 := andb.
 
-CertiCoq Compile -ext "_cps" demo2.
-CertiCoq Compile -anf demo2.
-CertiCoq Compile -anf -o1 -ext "_opt" demo2.
+CertiRocq Compile -ext "_cps" demo1.
+CertiRocq Compile -anf demo1.
+CertiRocq Compile -anf -o1 -ext "_opt" demo1.
+
+CertiRocq Compile -ext "_cps" demo2.
+CertiRocq Compile -anf demo2.
+CertiRocq Compile -anf -o1 -ext "_opt" demo2.
 
 (* Also works for CPS, when choosing another number of arguments, e.g. -args 1 *)
-CertiCoq Compile -ext "_cps" demo3.
-CertiCoq Compile -anf demo3.
-CertiCoq Compile -anf -o1 -ext "_opt" demo3.
+CertiRocq Compile -ext "_cps" demo3.
+CertiRocq Compile -anf demo3.
+CertiRocq Compile -anf -o1 -ext "_opt" demo3.
 
 Definition list_sum := List.fold_left plus (List.repeat 1 100) 0.
 
-CertiCoq Compile -ext "_cps" list_sum.
-CertiCoq Compile -anf list_sum.
-CertiCoq Compile -anf -o1 -ext "_opt" list_sum.
+CertiRocq Compile -ext "_cps" list_sum.
+CertiRocq Compile -anf list_sum.
+CertiRocq Compile -anf -o1 -ext "_opt" list_sum.
 
 
 Definition vs_easy :=
@@ -439,9 +439,9 @@ Definition vs_hard :=
   | _ => false
   end.
 
-CertiCoq Compile -ext "_cps" vs_easy.
-CertiCoq Compile -anf vs_easy.
-CertiCoq Compile -anf -o1 -ext "_opt" vs_easy.
+CertiRocq Compile -ext "_cps" vs_easy.
+CertiRocq Compile -anf vs_easy.
+CertiRocq Compile -anf -o1 -ext "_opt" vs_easy.
 
 (* Zoe: Compiling with the CPS pipeline takes much longer for vs_easy.
    The overhead seems to come from the C translation: (maybe has to do with dbg/error messages?)
@@ -467,20 +467,20 @@ Debug: Time elapsed in LambdaANF ANF:  0.020384
 Debug: Time elapsed in LambdaANF Pipeline:  0.148308
 Debug: Time elapsed in Codegen:  2.394216 *)
 
-CertiCoq Compile -ext "_cps" vs_hard.
-CertiCoq Compile -anf vs_hard.
-CertiCoq Compile -anf -o1 -ext "_opt" vs_hard.
+CertiRocq Compile -ext "_cps" vs_hard.
+CertiRocq Compile -anf vs_hard.
+CertiRocq Compile -anf -o1 -ext "_opt" vs_hard.
 
 Definition binom := Binom.main.
 
-CertiCoq Compile -ext "_cps" binom. (* returns nat *)
-CertiCoq Compile -anf binom.  (* returns nat *)
-CertiCoq Compile -anf -o1 -ext "_opt" binom.  (* returns nat *)
+CertiRocq Compile -ext "_cps" binom. (* returns nat *)
+CertiRocq Compile -anf binom.  (* returns nat *)
+CertiRocq Compile -anf -o1 -ext "_opt" binom.  (* returns nat *)
 
 Definition color := Color.main.
 
-CertiCoq Compile -ext "_cps" color.
-CertiCoq Compile -anf color.
-CertiCoq Compile -anf -o1 -ext "_opt" color.
+CertiRocq Compile -ext "_cps" color.
+CertiRocq Compile -anf color.
+CertiRocq Compile -anf -o1 -ext "_opt" color.
 *)
 *)

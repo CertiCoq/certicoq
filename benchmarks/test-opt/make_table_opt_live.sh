@@ -9,7 +9,7 @@ N=$1
 # First run ocaml scripts
 
 
-echo "Running CertiCoq programs..."
+echo "Running CertiRocq programs..."
 printf "      &  LIVE 0  &  LIVE 1  &  LIVE 2  &  LIVE 10 \n"
 for f in $FILES
 do

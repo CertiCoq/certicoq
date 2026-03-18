@@ -1,4 +1,4 @@
-open Metacoq_template_plugin.Ast_quoter
+open Metarocq_template_plugin.Ast_quoter
 open Names
 open Pp
 open Caml_bytestring
@@ -6,7 +6,7 @@ open Caml_bytestring
   
 let debug_opt =
   let open Goptions in
-  let key = ["CertiCoq"; "Debug"] in
+  let key = ["CertiRocq"; "Debug"] in
   match get_option_value key with
   | Some get -> fun () ->
       begin match get () with
@@ -52,11 +52,11 @@ let rec debug_mappings (ms : (Kernames.kername * Kernames.ident) list) : unit =
 let help_msg : string =
   "Usage:\n\
 To compile an Gallina definition named <gid> type:\n\
-   CertiCoqC Compile <options> <gid>.\n\n\
+   CertiRocqC Compile <options> <gid>.\n\n\
 To show this help message type:\n\
-   CertiCoqC -help.\n\n\
+   CertiRocqC -help.\n\n\
 To produce an .ir file with the last IR (lambda-anf) of the compiler type:\n\
-   CertiCoqC Show IR <options> <gid>.\n\n\
+   CertiRocqC Show IR <options> <gid>.\n\n\
 Valid options:\n\
 -file S   :  Specify the filename. Default: the fully qualified name of <gid>.\n\
 -ext S    :  Specify the string s to be appended to the filename\n\
@@ -67,9 +67,8 @@ Valid options:\n\
 -cps      :  Compile using continuation-passing style code (default: direct-style compilation)\n\
 -time     :  Time each compilation phase\n\
 -time_anf :  Time λanf optimizations\n\
--unsafe-erasure   :  Allow to use unsafe passes in the MetaCoq Erasure pipeline. This currently includes the cofixpoint-to-fixpoint translation.\n\
--typed-erasure    :  Uses the typed erasure and de-arging phase of the MetaCoq Erasure pipeline.\n\
+-unsafe-erasure   :  Allow to use unsafe passes in the MetaRocq Erasure pipeline. This currently includes the cofixpoint-to-fixpoint translation.\n\
+-typed-erasure    :  Uses the typed erasure and de-arging phase of the MetaRocq Erasure pipeline.\n\
 \n\n\
 To compile Gallina constants to specific C functions use:\n\
-   CertiCoqC Compile <options> <gid> Extract Constants [ constant1 => \"c_function1\", ... , constantN => \"c_functionN\" ] Include [ \"file1.h\", ... , \"fileM.h\" ]."
-
+   CertiRocqC Compile <options> <gid> Extract Constants [ constant1 => \"c_function1\", ... , constantN => \"c_functionN\" ] Include [ \"file1.h\", ... , \"fileM.h\" ]."

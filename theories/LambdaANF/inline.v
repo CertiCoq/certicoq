@@ -1,15 +1,15 @@
 Require Import Common.compM Common.Pipeline_utils.
-From Coq Require Import ZArith.ZArith Lists.List micromega.Lia.
+From Stdlib Require Import ZArith.ZArith Lists.List micromega.Lia.
 Import ListNotations.
 Require Import identifiers.
 Require Import LambdaANF.state LambdaANF.cps_util LambdaANF.cps_show LambdaANF.ctx LambdaANF.uncurry LambdaANF.shrink_cps LambdaANF.rename LambdaANF.inline_letapp LambdaANF.cps.
 Require Import ExtLib.Structures.Monad.
 Require Import ExtLib.Structures.MonadState.
 Require Import ExtLib.Data.Monads.StateMonad.
-Require Coq.Program.Wf.
-Require Import Program.
-Require Import Coq.Structures.OrdersEx.
-Require Import MetaCoq.Utils.bytestring.
+From Stdlib Require Program.Wf.
+From Stdlib Require Import Program.
+From Stdlib Require Import Structures.OrdersEx.
+Require Import MetaRocq.Utils.bytestring.
 Import MonadNotation.
 Open Scope monad_scope.
 
@@ -25,19 +25,19 @@ Record InlineHeuristic (St:Type) :=
 
 Definition fun_map := M.t (fun_tag * list var * exp).
 
-Definition inline_state := (bool * name_env)%type. 
+Definition inline_state := (bool * name_env)%type.
 (* We keep a state consisting of the old name map and a boolean state to "click"
    when a function is inlined (so that we stop iterating) *)
 
-Definition inlineM : Type -> Type := @compM' inline_state.  
+Definition inlineM : Type -> Type := @compM' inline_state.
 
 Section Inline.
 
   Variable St:Type.
   (* Pretty print the state for debugging purposes *)
-  Variable (pp_St : St -> name_env -> string). 
+  Variable (pp_St : St -> name_env -> string).
   Variable IH : InlineHeuristic St.
-  
+
   Variable (max_var : var). (* The maximum reserved variable *)
 
   Definition click : inlineM unit :=
@@ -52,7 +52,7 @@ Section Inline.
     '(_, nenv_old) <- get_state () ;;
     get_names_lst' xs "" nenv_old.
 
-  
+
   (* Construct known-functions map *)
   Fixpoint add_fundefs (fds:fundefs) (fm: fun_map) : fun_map :=
     match fds with
@@ -79,12 +79,12 @@ Section Inline.
     (d2, d2 + Nat.b2n (Nat.odd d)).
 
   Lemma split_fuel_add d :
-    d = fst (split_fuel d) + snd (split_fuel d). 
+    d = fst (split_fuel d) + snd (split_fuel d).
   Proof.
-    unfold split_fuel. simpl. rewrite (Nat.div2_odd d) at 1. simpl.    
+    unfold split_fuel. simpl. rewrite (Nat.div2_odd d) at 1. simpl.
     lia.
-  Qed.    
-  
+  Qed.
+
   Fixpoint inline_exp (d : nat) (j : nat) {struct d} :=
     let fix inline_exp_aux (e : exp) (sig : r_map) (fm:fun_map) (s:St) {struct e} : inlineM exp :=
         match e with
@@ -109,7 +109,7 @@ Section Inline.
          x' <- get_fresh_name x ;;
          e' <- inline_exp_aux e (M.set x x' sig) fm s ;;
          ret (Eproj x' t n y' e')
-       | Eletapp x f t ys ec =>         
+       | Eletapp x f t ys ec =>
          let f' := apply_r sig f in
          let ys' := apply_r_list sig ys in
          let '(s', s'' , inl_dec) := update_letApp _ IH f t ys' s in
@@ -117,14 +117,14 @@ Section Inline.
          (* log_msg ("Application of " ++ fstr ++ " is " ++ (if inl_dec then else "not ") ++ "inlined") ;; *)
          (match (inl_dec, M.get f fm, d, j) with
           | (true, Some  (ft, xs, e), S d', S j') =>
-            if (Nat.eqb (List.length xs) (List.length ys)) then 
+            if (Nat.eqb (List.length xs) (List.length ys)) then
               let sig' := set_list (combine xs ys') sig  in
               x' <- get_fresh_name x ;;
               let '(j1, j2) := split_fuel j' in
               e' <- inline_exp d' j1 e sig' (M.remove f fm) s' ;;
               match inline_letapp e' x' with
               | Some (C, x') =>
-                click ;; 
+                click ;;
                 ec' <- inline_exp d' j2 ec (M.set x x' sig) fm s'' ;;
                 ret (C |[ ec' ]|)
               | _ =>
@@ -142,7 +142,7 @@ Section Inline.
             ret (Eletapp x' f' t ys' ec')
           end)
        | Efun fds e =>
-         let fm' := add_fundefs fds fm in         
+         let fm' := add_fundefs fds fm in
          let (s1, s2) := update_funDef _ IH fds sig s in
          let names := all_fun_name fds in
          names' <- get_fresh_names names ;;
@@ -213,21 +213,21 @@ Section Inline.
         end
     in
     let (_, ct, it, ft, c, f, names, imap,  l) := c in
-    
-    (mkCompData new_var ct it ft c f (M.empty _) imap l, names). 
- 
 
-  
+    (mkCompData new_var ct it ft c f (M.empty _) imap l, names).
+
+
+
   Definition inline_top' (d:nat) (s:St) (e:exp) (c:comp_data) : error exp * comp_data * bool :=
-    let (c, nenv) := restart_names e c in     
+    let (c, nenv) := restart_names e c in
     let '(e', (st', (click, _old_map))) := run_compM (inline_exp d d e (M.empty var) (M.empty _) s) c (false, nenv) in
     (e', st', click).
 
   Definition inline_top (d:nat) (s:St) (e:exp) (c:comp_data)  : error exp * comp_data :=
     let '(e', st', _click) := inline_top' d s e c in
     (e', st').
-  
-  
+
+
   (* Run until nothing changes and call shrink reducer after each pass *)
   Fixpoint inline_loop_aux (fuel : nat) (d:nat) (s:St) (e:exp) (c:comp_data)  : error exp * comp_data :=
     match fuel with
@@ -235,7 +235,7 @@ Section Inline.
     | S fuel =>
       let '(e', c', click) := inline_top' d s e c in
       match e' with
-      | Ret e' => 
+      | Ret e' =>
         if click then
           inline_loop_aux fuel d s (fst (shrink_cps.shrink_top e')) c'
         else (Ret (fst (shrink_cps.shrink_top e')) , c')
@@ -286,10 +286,10 @@ Definition CombineInlineHeuristic {St1 St2:Type} (deci:bool -> bool -> bool)
 Definition forall_fundefs (f : exp -> bool) : fundefs -> bool :=
   fun fns =>
   let fix aux fns :=
-    match fns with 
+    match fns with
     | Fnil => true
     | Fcons x t xs e tl => (f e && aux tl)%bool
-    end 
+    end
   in aux fns.
 
 (* Don't inline functions with nested function definitions (code duplication)
@@ -298,9 +298,9 @@ Definition forall_fundefs (f : exp -> bool) : fundefs -> bool :=
 
 Fixpoint do_inline (f : var) (e : exp) :=
   match e with
-  | Econstr _ _ _  e 
+  | Econstr _ _ _  e
   | Eproj _ _ _ _ e
-  | Eprim_val _ _ e 
+  | Eprim_val _ _ e
   | Eprim _ _ _ e => do_inline f e
   | Ecase _ _ => false
   | Efun fns e => (forall_fundefs (do_inline f) fns && do_inline f e)%bool
@@ -308,7 +308,7 @@ Fixpoint do_inline (f : var) (e : exp) :=
   | Eapp f' _ _ => negb (BinPosDef.Pos.eqb f f')
   | Ehalt _ => true
   end.
-    
+
 
 Definition InlineSmall (bound:nat): InlineHeuristic (M.t bool) :=
   {| (* Inline small functions, but not inside their body (alternatively, check if they are recursive) *)
@@ -336,7 +336,7 @@ Definition InlineSmall (bound:nat): InlineHeuristic (M.t bool) :=
 
 Open Scope positive.
 
-Definition InlinedUncurriedMarked : InlineHeuristic (M.t nat) :=  
+Definition InlinedUncurriedMarked : InlineHeuristic (M.t nat) :=
   {| update_funDef := fun (fds:fundefs) (sigma:r_map) (s:_) => (s, s);
      update_inFun := fun (f:var) (t:fun_tag) (xs:list var) (e:exp) (sigma:r_map) (s:_) => s;
      update_App := fun (f:var) (t:fun_tag) (ys:list var) (s:_) =>
@@ -428,7 +428,7 @@ Definition InlineSmallOrUncurried (bound:nat): InlineHeuristic (prod (M.t bool) 
   CombineInlineHeuristic orb (InlineSmall bound) InlinedUncurriedMarked.
 
 Definition inline_uncurry (max_var : var) (bound:nat) (d:nat) (e:exp) (c : comp_data) :=
-  let inline_map := inline_map c in  
+  let inline_map := inline_map c in
   inline_top _ (InlineSmallOrUncurried bound) max_var d (M.empty _, inline_map) e c.
 
 (* Run after hoisting to eliminate outermost lambdas (e.g, repeat) *)
@@ -469,7 +469,7 @@ Definition InineLifted: InlineHeuristic (M.t bool) :=
                         match M.get f s with
                         | Some true => (s, s, true)
                         | _ => (s, s, false)
-                        end;                       
+                        end;
   |}.
 
 Definition inline_lifted (max_var : var) (bound:nat) (d:nat) (e:exp) (c : comp_data) :=
@@ -493,7 +493,7 @@ Definition inline_none (max_var : var) (e:exp) (bound:nat) (d:nat) (c : comp_dat
 Fixpoint find_wrappers (fds : fundefs) (s:M.t bool) : M.t bool :=
   match fds with
   | Fcons f _ _ (Eapp g _ _) fds' =>
-    (* f immediately calls g -- inline f *) 
+    (* f immediately calls g -- inline f *)
     let s' := if (f =? g) then s else  M.set f true s in
     find_wrappers fds' s'
   | _ => s
@@ -514,7 +514,7 @@ Definition InineLambdaLifted: InlineHeuristic (M.t bool) :=
                         match M.get f s with
                         | Some true => (s, s, true)
                         | _ => (s, s, false)
-                        end;                       
+                        end;
   |}.
 
 Definition inline_lambda_lifted (max_var : var) (e:exp) (s:M.t nat) (bound:nat) (d:nat) (c : comp_data) :=

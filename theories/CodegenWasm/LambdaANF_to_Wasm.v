@@ -1,13 +1,13 @@
 From Wasm Require Import datatypes operations.
 
-From Coq Require Import
+From Stdlib Require Import
   FMapAVL MSetAVL
   POrderedType
   ZArith BinNat List Lia.
 
 From ExtLib Require Import Structures.Monad.
 
-From CertiCoq Require Import
+From CertiRocq Require Import
   LambdaANF.toplevel
   LambdaANF.cps_util
   Common.Pipeline_utils
@@ -17,7 +17,7 @@ From CertiCoq Require Import
   CodegenWasm.LambdaANF_to_Wasm_restrictions
   CodegenWasm.LambdaANF_to_Wasm_primitives.
 
-From MetaCoq.Utils Require Import bytestring MCString.
+From MetaRocq.Utils Require Import bytestring MRString.
 
 Import MonadNotation compM.
 
@@ -153,7 +153,7 @@ Definition translate_call (nenv : name_env) (lenv : localvar_env) (fenv : fname_
   (* all fns return nothing, type = num args *)
 
 
-(* ***** CONSTRUCTOR REPRESENTATION (as CertiCoq's C backend/OCaml) ****** *)
+(* ***** CONSTRUCTOR REPRESENTATION (as CertiRocq's C backend/OCaml) ****** *)
 
 (* Example placement of constructors in the linear memory (each cell is 4 bytes):
    data BTree := Leaf | Node BTree Nat BTree
@@ -232,18 +232,19 @@ Fixpoint create_case_nested_if_chain (boxed : bool) (v : localidx) (es : list (N
 
 (* **** TRANSLATE PRIMITIVE VALUES **** *)
 
-Definition translate_primitive_value (p : AstCommon.primitive) : error Wasm_int.Int64.int :=
+Definition translate_primitive_value (p : AstCommon.primitive_value) : error Wasm_int.Int64.int :=
   match projT1 p as tag return prim_value tag -> error Wasm_int.Int64.T with
   | AstCommon.primInt => fun i => Ret (Wasm_int.Int64.repr (Uint63.to_Z i))
   | AstCommon.primFloat => fun f => Err "Extraction of floats to Wasm not yet supported"
+  | AstCommon.primString => fun f => Err "Extraction of strings to Wasm not yet supported"
   end (projT2 p).
 
 
 (* **** TRANSLATE PRIMITIVE OPERATIONS **** *)
 
 (* actual translation in _primitives file *)
-Definition translate_primitive_operation (nenv : name_env) (lenv : localvar_env) (p : (kername * string * bool * nat)) (args : list var) : error (list basic_instruction) :=
-  let '(op_name, _, _, _) := p in
+Definition translate_primitive_operation (nenv : name_env) (lenv : localvar_env) (p : primitive) (args : list var) : error (list basic_instruction) :=
+  let op_name := p.(prim_name) in
   match KernameMap.find op_name primop_map with
   | Some op =>
       match args with

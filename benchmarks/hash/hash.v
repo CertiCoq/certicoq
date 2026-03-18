@@ -1,7 +1,7 @@
-Require Import Arith List String.
+From Stdlib Require Import Arith List String.
 Require Import ExtLib.Structures.Monad.
 Require Import ExtLib.Structures.Functor.
-From CertiCoq.Plugin Require Import CertiCoq.
+From CertiRocq.Plugin Require Import CertiRocq.
 
 Import MonadNotation.
 Open Scope monad_scope.
@@ -77,7 +77,7 @@ Definition prog
   origin "Joomy" ;;
   origin "Andrew".
 
-CertiCoq FFI IO_Impl.
-CertiCoq FFI StringFFI.
-CertiCoq FFI HashFFI.
-CertiCoq Compile -cps prog.
+CertiRocq FFI IO_Impl.
+CertiRocq FFI StringFFI.
+CertiRocq FFI HashFFI.
+CertiRocq Compile -cps prog.

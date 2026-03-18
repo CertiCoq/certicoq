@@ -1,4 +1,4 @@
-(* Proof of correctness of the Wasm code generation phase of CertiCoq,
+(* Proof of correctness of the Wasm code generation phase of CertiRocq,
    this file is based on the proof for the Clight backend.
 
  > Codegen relation: relates expressions to Wasm instructions
@@ -20,7 +20,7 @@ From compcert Require Import
   Coqlib
   lib.Integers common.Memory.
 
-From CertiCoq Require Import
+From CertiRocq Require Import
   LambdaANF.cps LambdaANF.eval LambdaANF.cps_util LambdaANF.List_util
   LambdaANF.Ensembles_util LambdaANF.identifiers
   LambdaANF.shrink_cps_corresp
@@ -30,9 +30,9 @@ From CertiCoq Require Import
   CodegenWasm.LambdaANF_to_Wasm_restrictions
   CodegenWasm.LambdaANF_to_Wasm_primitives.
 
-From MetaCoq Require Import Common.Kernames.
+From MetaRocq Require Import Common.Kernames.
 
-From Coq Require Import
+From Stdlib Require Import
   Program.Program Sets.Ensembles
   Logic.Decidable Lists.ListDec
   Relations.Relations Relations.Relation_Operators Lia
@@ -353,7 +353,7 @@ Inductive repr_primitive_operation {lenv} : primop -> list positive  -> list bas
 
 Inductive repr_call_grow_mem_if_necessary : N (* at least mem available, known statically *) ->
                                             N (* bytes required for alloc *) ->
-                                            N (* at least mem available after allocation *) -> 
+                                            N (* at least mem available after allocation *) ->
                                             list basic_instruction (* generated instr *) -> Prop :=
 | G_enough_mem : forall mem mem' bytes,
   (bytes <= mem)%N ->
@@ -465,7 +465,7 @@ Inductive repr_expr_LambdaANF_Wasm {lenv} : LambdaANF.cps.exp -> N -> list basic
 | R_prim : forall x x' p op_name s b n op ys e e' prim_instrs mem mem' grow_instr,
     repr_var (lenv:=lenv) x x' ->
     repr_expr_LambdaANF_Wasm e mem' e' ->
-    M.get p penv = Some (op_name, s, b, n) ->
+    M.get p penv = Some (Pipeline_utils.mk_primitive op_name s b n) ->
     KernameMap.find op_name primop_map = Some op ->
     repr_primitive_operation (lenv:=lenv) op ys prim_instrs ->
     repr_call_grow_mem_if_necessary mem 52%N mem' grow_instr ->
@@ -578,14 +578,17 @@ Proof.
       unfold get_ctor_arity. now rewrite Hc.
     + (* Non-nullary constructor *)
       remember (v0 :: l') as l.
-      destruct (store_constructor nenv cenv lenv fenv t l) eqn:Hstore_constr; inv H.
-      destruct (get_ctor_size _ _) eqn:HconstrSize. inv H1.
+      destruct (store_constructor nenv cenv lenv fenv t l) eqn:Hstore_constr; cbn [bind MonadError] in H; inv H.
+      destruct (get_ctor_size _ _) eqn:HconstrSize; cbn [bind MonadError] in H1. inv H1.
       destruct (call_grow_mem_if_necessary mem n) eqn:Hgrow. inv H1.
       unfold store_constructor in Hstore_constr.
       destruct (get_ctor_ord cenv t) eqn:Hord; first by inv Hstore_constr.
+      cbn [bind MonadError] in Hstore_constr.
       destruct (store_constructor_args nenv lenv fenv (v0 :: l') 0) eqn:Hconstrargs; first by inv Hstore_constr.
-      destruct (translate_body _ _ _ _ _ _ _) eqn:Hbody; inv H0.
-      inv Hstore_constr.
+      cbn [bind MonadError] in Hstore_constr.
+      destruct (translate_body _ _ _ _ _ _ _) eqn:Hbody. inv H0.
+      cbn [bind MonadError] in H0. inv H0.
+      inv Hstore_constr. cbn.
       repeat rewrite <- app_assoc.
       apply call_grow_mem_if_necessary_correct in Hgrow.
 
@@ -699,7 +702,7 @@ Proof.
     destruct (call_grow_mem_if_necessary mem 52) eqn:Hgrow. inv H1.
     destruct (translate_body nenv cenv lenv fenv penv e _) eqn:H_eqTranslate. inv H0.
     unfold translate_primitive_operation in Hprimop.
-    do 3 destruct p0.
+    destruct p0.
     destruct (KernameMap.find _) eqn:Hker. 2: inv Hprimop.
     inv H0. cbn.
     apply call_grow_mem_if_necessary_correct in Hgrow.
@@ -3699,7 +3702,7 @@ Definition primitive_operation_reduces pfs : Prop :=
   forall lenv state s f fds f' (x : var) (x' : localidx) (p : prim) op_name str b op_arr op
          (ys : list var) (e : exp) (vs : list val) (rho : env) (v : val) instrs mem,
     M.get p pfs = Some f' ->
-    M.get p penv = Some (op_name, str, b, op_arr) ->
+    M.get p penv = Some (Pipeline_utils.mk_primitive op_name str b op_arr) ->
     KernameMap.find op_name primop_map = Some op ->
     map_injective lenv ->
     domains_disjoint lenv fenv ->
@@ -5803,7 +5806,7 @@ Proof with eauto.
         (* hide instrs after return instr in block context, won't be executed *)
         have Hlh := lholed_tail _ lh (map AI_basic grow_instr) (map AI_basic (prim_instrs ++ [:: BI_local_set x'] ++ e')).
         destruct Hlh as [k' [lh' Heq']].
-        have Hbad := HRedRet _ lh'. 
+        have Hbad := HRedRet _ lh'.
         destruct Hbad as [sr' [k'' [lh'' [Hred [Hfuncs [HvalPreserved HoutofM]]]]]].
         exists sr', fr, k'', lh''. split.
         rewrite -Heq' in Hred. rewrite map_cat.

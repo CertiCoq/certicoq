@@ -192,6 +192,6 @@ void certirocq_modify(struct thread_info *ti, value *p_cell, value p_val);
 
 void print_heapsize(struct thread_info *ti);
 
-extern value call(struct thread_info *, value, value);
+value closure_call(struct thread_info *, value, value);
 
 #endif /* CERTIROCQ_GC_STACK_H */

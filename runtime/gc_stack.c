@@ -555,7 +555,7 @@ struct closure {
   value env;
 };
 
-value call(struct thread_info *$tinfo, value $clo, value $arg)
+value closure_call(struct thread_info *$tinfo, value $clo, value $arg)
 {
   register value (*$f)(struct thread_info*, value, value);
   register value $envi;

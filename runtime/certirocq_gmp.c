@@ -156,10 +156,10 @@ value z_nat_case(struct thread_info* tinfo, gmp_int discr, value zero_case, valu
   trace("z_nat_case called with %s\n", print_gmp_int(discr));
   if (z_is_zero(discr) == 1) {
     trace("z_nat_case, 0 case\n");
-    return call(tinfo, zero_case, discr);
+    return closure_call(tinfo, zero_case, discr);
   } else {
     gmp_int p = z_nat_pred(tinfo, discr);
-    return call(tinfo, succ_case, p);
+    return closure_call(tinfo, succ_case, p);
   }
 }
 
@@ -168,10 +168,10 @@ value z_nat_case_untyped_erasure(struct thread_info* tinfo, value dummy, gmp_int
   trace("z_nat_case_untyped called with %s\n", print_gmp_int(discr));
   if (z_is_zero(discr) == 1) {
     trace("z_nat_case, 0 case\n");
-    return call(tinfo, zero_case, discr);
+    return closure_call(tinfo, zero_case, discr);
   } else {
     gmp_int p = z_nat_pred(tinfo, discr);
-    return call(tinfo, succ_case, p);
+    return closure_call(tinfo, succ_case, p);
   }
 }
 gmp_int gmp_abs(struct thread_info *tinfo, mpz_t x) {

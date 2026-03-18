@@ -143,3 +143,5 @@ result
 /benchmarks/metarocq_erasure/CertiRocq.Benchmarks.metarocq_erasure.metarocq_erasure.metarocq_erasure.h
 /benchmarks/ffi/Makefile
 /benchmarks/ffi/.Makefile.d
+bootstrap/certirocqchk/glue.*
+bootstrap/certirocqc/glue.*

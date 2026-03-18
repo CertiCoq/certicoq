@@ -10,7 +10,7 @@ Import ListNotations.
 
 Section Pipeline.
   Context (next_id : positive)
-    (prims : list (Kernames.kername * string * bool * nat * positive))
+    (prims : list (primitive * positive))
     (debug : bool).
 
   Definition CertiRocq_pipeline econf im (p : Ast.Env.program) :=

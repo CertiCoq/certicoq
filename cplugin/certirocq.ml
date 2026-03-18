@@ -8,6 +8,7 @@ open Metarocq_template_plugin.Ast_quoter
 open ExceptionMonad
 open AstCommon
 open Plugin_utils
+open Caml_nat
 
 let get_stringopt_option key =
   let open Goptions in
@@ -81,7 +82,7 @@ let debug_msg (flag : bool) (s : string) =
 
 (* Separate registration of primitive extraction *)
 
-type prim = ((Kernames.kername * Kernames.ident) * bool)
+type prim = ((Kernames.kername * Kernames.ident) * int * bool)
 let global_registers =
   Summary.ref (([], []) : prim list * import list) ~name:"CertiRocq Registration"
 
@@ -256,7 +257,7 @@ type options =
     dev       : int;
     prefix    : string;
     toplevel_name : string;
-    prims     : ((Kernames.kername * Kernames.ident) * bool) list;
+    prims     : prim list;
     inductives_mapping : inductives_mapping;
     extracted_inductives : extract_inductives;
   }
@@ -294,7 +295,7 @@ let default_options () : options =
     extracted_inductives = get_global_inductives_constant_mapping ();
   }
 
-let make_options (l : command_args list) (pr : ((Kernames.kername * Kernames.ident) * bool) list) (fname : string) : options =
+let make_options (l : command_args list) (pr : prim list) (fname : string) : options =
   let rec aux (o : options) l =
     match l with
     | [] -> o
@@ -335,6 +336,12 @@ let no_unsafe_passes = make_unsafe_passes false
 let quote_inductives_mapping l =
   List.map (fun (hd, (na, cstrs)) -> (hd, (bytestring_of_string na, List.map (fun i -> coq_nat_of_int i) cstrs))) l
 
+let quote_prims l =
+  let open Pipeline_utils in
+  List.map (fun ((x, y), ar, b) -> { prim_name = x; prim_target = y;
+                                     prim_arity = nat_of_caml_int ar;
+                                     prim_alloc = b}) l
+
 let make_pipeline_options (opts : options) =
   let erasure_config =
       Erasure0.({
@@ -356,6 +363,7 @@ let make_pipeline_options (opts : options) =
   let prefix = bytestring_of_string opts.prefix in
   let toplevel_name = bytestring_of_string opts.toplevel_name in
   let prims = get_global_prims () @ opts.prims in
+  let prims = quote_prims prims in
   let inductives_mapping = quote_inductives_mapping opts.inductives_mapping in
   (* Feedback.msg_debug Pp.(str"Prims: " ++ prlist_with_sep spc (fun ((x, y), wt) -> str (string_of_bytestring y)) prims); *)
   Pipeline.make_opts erasure_config inductives_mapping cps args anfc olevel timing timing_anf debug dev prefix toplevel_name prims

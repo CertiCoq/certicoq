@@ -742,7 +742,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
   let make_rt_file na =
     Boot.Env.Path.(to_string (relative (runtime_dir ()) na))
 
-  let c_flags = "" (* -O2 -fomit-frame-pointer *)
+  let c_flags = "-O2 -fomit-frame-pointer"
 
   let compile_C ~opaque_access opts gr imports =
     let () = compile_only ~opaque_access opts gr imports in
@@ -754,7 +754,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let compiler = compiler_executable debug in
     let rt_dir = runtime_dir () in
     let cmd =
-        Printf.sprintf "%s -Wno-everything %s -g -I %s -I %s -c -o %s %s"
+        Printf.sprintf "%s -fPIC -Wno-everything %s -g -I %s -I %s -c -o %s %s"
           compiler c_flags opts.build_dir (Boot.Env.Path.to_string rt_dir) (name ^ ".o") (name ^ ".c")
     in
     let importso =
@@ -775,7 +775,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     match Unix.system cmd with
     | Unix.WEXITED 0 ->
       let linkcmd =
-        Printf.sprintf "%s -Wno-everything -g -L %s -L %s -o %s %s %s %s"
+        Printf.sprintf "%s -fPIC -Wno-everything -g -L %s -L %s -o %s %s %s %s"
           compiler opts.build_dir (Boot.Env.Path.to_string rt_dir) name gc_stack_o (name ^ ".o") importso
       in
       debug_msg debug (Printf.sprintf "Executing command: %s" linkcmd);
@@ -985,7 +985,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let ocamlfind = ocamlfind_executable debug in
     let rt_dir = runtime_dir () in
     let cmd =
-        Printf.sprintf "%s -Wno-everything -O2 -fomit-frame-pointer -g -I %s -I %s -c -o %s %s"
+        Printf.sprintf "%s -fPIC -Wno-everything -O2 -fomit-frame-pointer -g -I %s -I %s -c -o %s %s"
           compiler opts.build_dir (Boot.Env.Path.to_string rt_dir) (Filename.remove_extension c_driver ^ ".o") c_driver
     in
     let importso =

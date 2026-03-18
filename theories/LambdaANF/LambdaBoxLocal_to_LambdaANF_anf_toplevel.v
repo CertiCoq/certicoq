@@ -1,22 +1,22 @@
 (* Top-level correctness theorems for ANF transformation *)
 (* ANF analog of LambdaBoxLocal_to_LambdaANF_toplevel.v (CPS version) *)
 
-Require Import MetaCoq.Utils.bytestring.
-From Coq Require Import ZArith.ZArith Lists.List micromega.Lia Arith
+From Stdlib Require Import ZArith.ZArith Lists.List micromega.Lia Arith
      Ensembles Relations.Relation_Definitions.
-Require Import Common.AstCommon.
+From CertiRocq Require Import Common.AstCommon Common.compM Pipeline_utils.
+Require Import MetaRocq.Utils.bytestring.
 Require compcert.lib.Maps compcert.lib.Coqlib.
 
 Import ListNotations.
 
 Require Import LambdaBoxLocal.expression LambdaBoxLocal.fuel_sem.
 
-Require Import cps cps_show eval ctx logical_relations
+Require Import cps cps_show eval ctx logical_relations LambdaANF.tactics
         List_util algebra alpha_conv functions Ensembles_util
-        tactics LambdaBoxLocal_to_LambdaANF LambdaBoxLocal_to_LambdaANF_util
+        LambdaBoxLocal_to_LambdaANF LambdaBoxLocal_to_LambdaANF_util
         LambdaBoxLocal_to_LambdaANF_anf_util
         LambdaBoxLocal_to_LambdaANF_anf_corresp LambdaBoxLocal_to_LambdaANF_anf_correct
-        LambdaANF.tactics identifiers bounds cps_util rename.
+        identifiers bounds cps_util rename.
 
 Require Import ExtLib.Data.Monads.OptionMonad ExtLib.Structures.Monads.
 
@@ -105,7 +105,7 @@ Section Refinement.
     (* Divergence *)
     (diverge [] e1 -> eval.diverge cenv (M.empty val) e2).
 
-  Context (prim_map : M.t (kername * string (* C definition *) * bool (* tinfo *) * nat (* arity *))).
+  Context (prim_map : M.t primitive).
   Context (func_tag kon_tag default_itag : positive)
           (next_id : positive).
   Context (dcon_to_tag_inj :

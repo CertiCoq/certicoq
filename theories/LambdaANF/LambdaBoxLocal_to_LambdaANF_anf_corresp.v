@@ -3,7 +3,7 @@
    ANF analog of LambdaBoxLocal_to_LambdaANF_corresp.v (CPS version). *)
 
 Require Import Common.AstCommon Common.compM.
-From Coq Require Import ZArith.ZArith Lists.List micromega.Lia Arith
+From Stdlib Require Import ZArith.ZArith Lists.List micromega.Lia Arith
      Ensembles Relations.Relation_Definitions.
 Require compcert.lib.Maps compcert.lib.Coqlib.
 Import ListNotations.
@@ -20,7 +20,7 @@ Require Import closure_conversion_corresp.
 
 Require Import ExtLib.Data.Monads.OptionMonad ExtLib.Structures.Monads.
 
-Require Import MetaCoq.Utils.bytestring.
+Require Import MetaRocq.Utils.bytestring.
 
 Import Monad.MonadNotation.
 
@@ -28,7 +28,7 @@ Open Scope monad_scope.
 
 Section Corresp.
 
-  Context (prim_map : M.t (kername * string (* C definition *) * bool (* tinfo *) * nat (* arity *)))
+  Context (prim_map : M.t Pipeline_utils.primitive)
           (func_tag default_tag : positive).
 
 

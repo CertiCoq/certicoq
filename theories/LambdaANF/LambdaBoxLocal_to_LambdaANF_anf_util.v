@@ -2,10 +2,11 @@
    Follows the pattern of LambdaBoxLocal_to_LambdaANF_util.v (CPS version).
    Contains the ANF value relation, and the alpha-equivalence proof. *)
 
-Require Import MetaCoq.Utils.bytestring.
-From Coq Require Import ZArith.ZArith Lists.List micromega.Lia Arith
+From Stdlib Require Import ZArith.ZArith Lists.List micromega.Lia Arith
      Ensembles Relations.Relation_Definitions.
 Require Import Common.AstCommon.
+Require Import MetaRocq.Utils.bytestring.
+
 Require compcert.lib.Maps compcert.lib.Coqlib.
 Require Import set_util.
 

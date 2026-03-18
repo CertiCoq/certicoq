@@ -1,9 +1,9 @@
 (* Correctness of the ANF transformation from LambdaBoxLocal to LambdaANF *)
 (* Follows the same proof technique as LambdaBoxLocal_to_LambdaANF_correct.v (CPS) *)
 
-Require Import MetaCoq.Utils.bytestring.
-From Coq Require Import ZArith.ZArith Lists.List micromega.Lia Arith
+From Stdlib Require Import ZArith.ZArith Lists.List micromega.Lia Arith
      Ensembles Relations.Relation_Definitions.
+Require Import MetaRocq.Utils.bytestring.
 Require Import Common.AstCommon.
 Require compcert.lib.Maps compcert.lib.Coqlib.
 Require Import set_util.
@@ -31,7 +31,7 @@ Open Scope monad_scope.
 
 Section Correct.
 
-  Context (prim_map : M.t (kername * string (* C definition *) * bool * nat (* arity *))).
+  Context (prim_map : M.t Pipeline_utils.primitive).
   Context (func_tag kon_tag default_tag default_itag : positive)
           (cnstrs : conId_map)
           (cenv : ctor_env).
@@ -302,7 +302,7 @@ Section Correct.
       eapply nth_error_Forall2; [ | exact Hlen ].
       intros n t Hnth.
       assert (Hn_bound : (n < efnlength fns)%nat).
-      { eapply MCList.nth_error_Some_length in Hnth. lia. }
+      { eapply MRList.nth_error_Some_length in Hnth. lia. }
       assert (Hnth_vs := Hnth_vs' n Hn_bound).
       rewrite Hnth_vs in Hnth. inv Hnth.
       assert (Hn_rev : (n < Datatypes.length (rev fnames))%nat).
@@ -319,7 +319,7 @@ Section Correct.
       + econstructor; try eassumption.
         rewrite Nnat.Nat2N.id.
         assert (Hf' := Hf).
-        rewrite MCList.nth_error_rev_inv in Hf';
+        rewrite MRList.nth_error_rev_inv in Hf';
           [ | rewrite length_rev in Hn_rev; exact Hn_rev ].
         rewrite Hfnames_len in Hf'.
         replace (efnlength fns - S n)%nat with (efnlength fns - n - 1)%nat in Hf' by lia.
@@ -445,16 +445,16 @@ Section Correct.
     - eapply nth_error_Forall2; [ | exact Hlen_rev ].
       intros n v1r Hnth_v1r.
       assert (Hn_bound : (n < Datatypes.length xs)%nat).
-      { rewrite <- Hlen_rev. eapply MCList.nth_error_Some_length. exact Hnth_v1r. }
+      { rewrite <- Hlen_rev. eapply MRList.nth_error_Some_length. exact Hnth_v1r. }
       (* v1r = (rev vs1)[n] = vs1[length vs1 - 1 - n] *)
       assert (Hnth_v1r' := Hnth_v1r).
-      rewrite MCList.nth_error_rev_inv in Hnth_v1r'; [ | rewrite length_rev in *; lia ].
+      rewrite MRList.nth_error_rev_inv in Hnth_v1r'; [ | rewrite length_rev in *; lia ].
       (* xs[n] is some variable x *)
       destruct (nth_error xs n) as [x | ] eqn:Hx; [ | exfalso; apply nth_error_None in Hx; lia ].
       eexists. split. reflexivity.
       (* M.get x rho' = vs2[length xs - 1 - n] *)
       assert (Hnth_rev_xs : nth_error (rev xs) (Datatypes.length xs - 1 - n) = Some x).
-      { rewrite MCList.nth_error_rev_inv; [ | lia ].
+      { rewrite MRList.nth_error_rev_inv; [ | lia ].
         replace (Datatypes.length xs - S (Datatypes.length xs - 1 - n))%nat with n by lia.
         exact Hx. }
       assert (Hget_x : nth_error vs2 (Datatypes.length xs - 1 - n) = M.get x rho').
@@ -555,7 +555,7 @@ Section Correct.
       simpl ctx_bind_proj.
       change (rev (a :: vars)) with (rev vars ++ [a]) in *.
       revert vs Hget Hset.
-      intros vs. eapply MCList.rev_ind with (l := vs).
+      intros vs. eapply MRList.rev_ind with (l := vs).
       + intros Hget Hset. eapply set_lists_length_eq in Hset.
         rewrite length_app in Hset. simpl in Hset. lia.
       + intros x l IH Hget Hset.

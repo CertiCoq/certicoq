@@ -107,6 +107,12 @@ result
 /tests/axioms/list_sum_int63_tinfo
 /tests/ocaml/main
 /tests/ocaml/mainopt
+/tests/ocaml/demo1.*
+/tests/ocaml/demo2.*
+/tests/ocaml/list_sum.*
+/tests/ocaml/color.*
+/tests/ocaml/sha.*
+/tests/ocaml/sha_fast.*
 /tests/programs/CertiRocq.Tests.tests.*.c
 /tests/programs/CertiRocq.Tests.tests.*.h
 /tests/programs/glue_*.c

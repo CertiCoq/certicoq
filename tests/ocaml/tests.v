@@ -71,7 +71,6 @@ Definition sha_fast (_ : unit) := sha256.SHA_256' (sha256.str_to_bytes test).
 
 Extraction "demo1" demo1.
 Extraction "demo2" demo2.
-Extraction "demo2" demo2.
 Extraction "list_sum" list_sum.
 (* Modified by hand *)
 (* Extraction "vs_easy_aut" vs_easy. *)

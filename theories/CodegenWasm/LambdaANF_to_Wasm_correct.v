@@ -465,7 +465,7 @@ Inductive repr_expr_LambdaANF_Wasm {lenv} : LambdaANF.cps.exp -> N -> list basic
 | R_prim : forall x x' p op_name s b n op ys e e' prim_instrs mem mem' grow_instr,
     repr_var (lenv:=lenv) x x' ->
     repr_expr_LambdaANF_Wasm e mem' e' ->
-    M.get p penv = Some (op_name, s, b, n) ->
+    M.get p penv = Some (Pipeline_utils.mk_primitive op_name s b n) ->
     KernameMap.find op_name primop_map = Some op ->
     repr_primitive_operation (lenv:=lenv) op ys prim_instrs ->
     repr_call_grow_mem_if_necessary mem 52%N mem' grow_instr ->
@@ -702,7 +702,7 @@ Proof.
     destruct (call_grow_mem_if_necessary mem 52) eqn:Hgrow. inv H1.
     destruct (translate_body nenv cenv lenv fenv penv e _) eqn:H_eqTranslate. inv H0.
     unfold translate_primitive_operation in Hprimop.
-    do 3 destruct p0.
+    destruct p0.
     destruct (KernameMap.find _) eqn:Hker. 2: inv Hprimop.
     inv H0. cbn.
     apply call_grow_mem_if_necessary_correct in Hgrow.
@@ -3702,7 +3702,7 @@ Definition primitive_operation_reduces pfs : Prop :=
   forall lenv state s f fds f' (x : var) (x' : localidx) (p : prim) op_name str b op_arr op
          (ys : list var) (e : exp) (vs : list val) (rho : env) (v : val) instrs mem,
     M.get p pfs = Some f' ->
-    M.get p penv = Some (op_name, str, b, op_arr) ->
+    M.get p penv = Some (Pipeline_utils.mk_primitive op_name str b op_arr) ->
     KernameMap.find op_name primop_map = Some op ->
     map_injective lenv ->
     domains_disjoint lenv fenv ->

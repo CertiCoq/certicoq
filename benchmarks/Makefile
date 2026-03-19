@@ -9,10 +9,10 @@ CFILES=$(patsubst %, CertiRocq.Benchmarks.tests.%_cps.c, $(TESTS)) $(patsubst %,
 EXEC=$(TESTS) $(patsubst %, %_cps, $(TESTS)) $(patsubst %, %_cps_opt, $(TESTS)) $(patsubst %, %_opt, $(TESTS))
 INCLUDE=../runtime
 
-all: lib tests exec run run_wasm
+all: lib tests exec ffi run run_wasm
 default: exec run
 
-.PHONY: all default clean lib cleanlib tests run $(TESTS)
+.PHONY: all default clean lib cleanlib ffi cleanffi tests run $(TESTS)
 
 $(CFILES): tests
 exec: $(TESTS)
@@ -60,6 +60,15 @@ lib: lib/Makefile
 
 cleanlib:
 	$(MAKE) clean -C lib
+
+ffi/Makefile:
+	cd ffi; rocq makefile -f _RocqProject -o Makefile; mkdir _build
+
+ffi: ffi/Makefile
+	$(MAKE) -C ffi
+
+cleanffi:
+	$(MAKE) clean -C ffi
 
 tests: tests.v
 	coqc $(COQOPTS) tests.v

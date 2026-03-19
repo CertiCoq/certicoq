@@ -16,4 +16,4 @@ From CertiRocq.LambdaANF Require Import PrototypeGenFrame cps.
 MetaRocq Run (mk_Frame_ops
   (MPfile ["cps_proto_univ"; "LambdaANF"; "CertiRocq"])
   (MPfile ["cps"; "LambdaANF"; "CertiRocq"], "exp")
-  exp [var; fun_tag; ctor_tag; prim; N; list var; primitive]).
+  exp [var; fun_tag; ctor_tag; prim; N; list var; primitive_value]).

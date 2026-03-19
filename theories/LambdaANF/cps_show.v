@@ -106,11 +106,11 @@ Definition chr_newline : Byte.byte := "010"%byte.
 
 Definition newline : M unit := emit (String.String chr_newline String.EmptyString).
 
-Definition emit_prim (p : primitive) : M unit :=
+Definition emit_prim (p : primitive_value) : M unit :=
   match projT1 p as tag return prim_value tag -> M unit with
   | primInt => fun f => emit "(int: " ;; emit (Show.string_of_prim_int f) ;; emit ")"
   | primFloat => fun f => emit "(float: " ;; emit (AstCommon.string_of_float f) ;; emit ")"
-
+  | primString => fun f => emit "(string: " ;; emit (Show.string_of_pstring f) ;; emit ")"
   end%bs (projT2 p).
 
 (* We assume each expression starts on a fresh newline, and that it

@@ -60,7 +60,7 @@ Inductive exp : Type :=
 | Eletapp: var -> var -> fun_tag -> list var -> exp -> exp
 | Efun: fundefs -> exp -> exp
 | Eapp: var -> fun_tag -> list var -> exp
-| Eprim_val: var -> primitive -> exp -> exp
+| Eprim_val: var -> primitive_value -> exp -> exp
 | Eprim: var -> prim -> list var -> exp -> exp (* where prim is id *)
 | Ehalt: var -> exp
 with fundefs : Type :=
@@ -336,7 +336,7 @@ Inductive val : Type :=
 (* [Vfun env fds f]
      where env is the environment at the function binding site
      fds is the list of mutually recursive functions including f *)
-| Vprim : primitive -> val
+| Vprim : primitive_value -> val
 | Vint : Z -> val.
 
 (** Induction principle for values. *)

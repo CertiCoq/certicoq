@@ -1,7 +1,61 @@
 From Stdlib Require Import ZArith.ZArith
         Program.Basics
         Lists.List Lia.
+From Stdlib Require PrimInt63 PrimString Uint63.
 Require Import List_util.
+
+Definition char_to_Z x := Uint63.to_Z x.
+Import ListNotations.
+Open Scope list_scope.
+
+Fixpoint encode_list (l : list PrimString.char63) : list Z :=
+  match l with
+  | nil => [7]
+  | [ x ] => (* ch 0%byte 0 0 0 0 0 07 *)
+      [two_power_pos 56 * char_to_Z x + 6]
+  | x :: y :: [] =>
+      [two_power_pos 56 * char_to_Z x +
+      two_power_pos 48 * char_to_Z y + 5]
+  | x :: y :: z :: [] =>
+      [two_power_pos 56 * char_to_Z x +
+      two_power_pos 48 * char_to_Z y +
+      two_power_pos 40 * char_to_Z z + 4]
+  | x :: y :: z :: w :: [] =>
+      [two_power_pos 56 * char_to_Z x +
+      two_power_pos 48 * char_to_Z y +
+      two_power_pos 40 * char_to_Z z +
+      two_power_pos 32 * char_to_Z w + 3]
+  | x :: y :: z :: w :: lx :: [] =>
+      [two_power_pos 56 * char_to_Z x +
+      two_power_pos 48 * char_to_Z y +
+      two_power_pos 40 * char_to_Z z +
+      two_power_pos 32 * char_to_Z w +
+      two_power_pos 24 * char_to_Z lx + 2]
+  | x :: y :: z :: w :: lx :: ly :: [] =>
+      [two_power_pos 56 * char_to_Z x +
+      two_power_pos 48 * char_to_Z y +
+      two_power_pos 40 * char_to_Z z +
+      two_power_pos 32 * char_to_Z w +
+      two_power_pos 24 * char_to_Z lx +
+      two_power_pos 16 * char_to_Z ly + 1]
+  | x :: y :: z :: w :: lx :: ly :: lz :: [] =>
+      [two_power_pos 56 * char_to_Z x +
+      two_power_pos 48 * char_to_Z y +
+      two_power_pos 40 * char_to_Z z +
+      two_power_pos 32 * char_to_Z w +
+      two_power_pos 24 * char_to_Z lx +
+      two_power_pos 16 * char_to_Z ly +
+      two_power_pos 8 * char_to_Z lz]
+  | x :: y :: z :: w :: lx :: ly :: lz :: lw :: l =>
+      (two_power_pos 56 * char_to_Z x +
+      two_power_pos 48 * char_to_Z y +
+      two_power_pos 40 * char_to_Z z +
+      two_power_pos 32 * char_to_Z w +
+      two_power_pos 24 * char_to_Z lx +
+      two_power_pos 16 * char_to_Z ly +
+      two_power_pos 8 * char_to_Z lz +
+      char_to_Z lw) :: encode_list l
+  end%Z.
 
 Require Import ExtLib.Structures.Monads
                ExtLib.Data.Monads.OptionMonad
@@ -726,10 +780,25 @@ Definition compile_float (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) (
   Field(var x, -1) :::= tag ;;;
   Field(var x, 0) :::= Econst_float f (Tfloat F64 noattr).
 
-Definition compile_primitive (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) (map : fun_info_env) (x : positive) (p : AstCommon.primitive) : statement :=
+Definition compile_string (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) (map : fun_info_env)
+  (x : positive) (f : PrimString.string) :=
+  let len := Uint63.to_Z (PrimString.length f) in
+  let words := ((len / 8) + 1)%Z in
+  let tag := c_int (words * two_power_pos 10 + 252) (Tlong Unsigned noattr) in
+  x ::= [val] (allocPtr +' (c_int Z.one val)) ;;;
+  allocIdent ::= allocPtr +' (c_int (1 + words) val) ;;;
+  let acc := Field(var x, -1) :::= tag in
+  let l := PrimStringAxioms.to_list f in
+  MRList.fold_left_i
+    (fun acc i ch =>
+       acc ;;;
+       Field(var x, Z.of_nat i) :::= Econst_long (Int64.repr ch) (Tlong Unsigned noattr)) (encode_list l) acc.
+
+Definition compile_primitive (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) (map : fun_info_env) (x : positive) (p : AstCommon.primitive_value) : statement :=
   match projT1 p as tag return AstCommon.prim_value tag -> statement with
   | AstCommon.primInt => fun i => x ::= Econst_long (to_int64 i) (Tlong Unsigned noattr)
   | AstCommon.primFloat => fun f => compile_float cenv ienv fenv map x (to_float f)
+  | AstCommon.primString => fun f => compile_string cenv ienv fenv map x f
   end (projT2 p).
 
 Fixpoint translate_body
@@ -809,11 +878,11 @@ Fixpoint translate_body
     ret (compile_primitive cenv ienv fenv map x p ;;; prog)
   | Eprim x p vs e' =>
     match prims ! p with
-    | Some (_, _, false, _) => (* compile without tinfo *)
+    | Some {| Pipeline_utils.prim_alloc := false |} => (* compile without tinfo *)
       prog <- translate_body e' fenv cenv ienv map ;;
       pr_call <- mkPrimCall x p (length vs) fenv map vs ;;
       ret (pr_call ;;; prog)
-    | Some (_, _, true, _) => (* compile with tinfo *)
+    | Some {| Pipeline_utils.prim_alloc := true |} => (* compile with tinfo *)
       prog <- translate_body e' fenv cenv ienv map ;;
       pr_call <- mkPrimCallTinfo x p (length vs) fenv map vs ;;
       ret (Efield tinfd allocIdent valPtr :::= allocPtr ;;;
@@ -910,11 +979,11 @@ Fixpoint translate_body_fast
     ret (compile_primitive cenv ienv fenv map x p ;;; prog)
   | Eprim x p vs e' =>
     match prims ! p with
-    | Some (_, _, false, _) => (* compile without tinfo *)
+    | Some {| Pipeline_utils.prim_alloc := false |} => (* compile without tinfo *)
       prog <- translate_body_fast e' fenv cenv ienv map myvs myind ;;
       pr_call <- mkPrimCall x p (length vs) fenv map vs ;;
       ret (pr_call ;;; prog)
-    | Some (_, _, true, _) => (* compile with tinfo *)
+    | Some {| Pipeline_utils.prim_alloc := true |} => (* compile with tinfo *)
       prog <- translate_body_fast e' fenv cenv ienv map myvs myind ;;
       pr_call <- mkPrimCallTinfo x p (length vs) fenv map vs ;;
       ret (pr_call ;;; prog)

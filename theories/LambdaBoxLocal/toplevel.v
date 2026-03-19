@@ -18,7 +18,7 @@ Definition LambdaBoxLocalTerm := prod ienv LambdaBoxLocal.expression.exp.
     BigStep := fun P Res => exists n, LambdaBoxLocal.expression.eval_n n (snd P) = Some Res
   }.
 
-Definition compile_LambdaBoxLocal (prims : list (kername * string * bool * nat * positive))
+Definition compile_LambdaBoxLocal (prims : list (primitive * positive))
   : CertiRocqTrans (Program LambdaBoxMut.compile.Term) LambdaBoxLocalTerm :=
   fun src =>
     debug_msg "Translating from LambdaBoxMut to LambdaBoxLocal"%bs ;;

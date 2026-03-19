@@ -20,7 +20,7 @@ else
     fi 
 fi
 
-echo "Cleaning result of extraction"
+echo "Copying result of extraction"
 
 rm -rf ${PLUGIN}/extraction || true
 
@@ -36,7 +36,7 @@ cd ${EPATH}
 for i in *.ml*
   do
   newi=../../"${PLUGIN}"/extraction/`echo $i | cut -b 1 | tr '[:upper:]' '[:lower:]'``echo $i | cut -b 2-`;
-  echo "Copying " $i "to" $newi;
+  # echo "Copying " $i "to" $newi;
   cp $i $newi;
 done
 

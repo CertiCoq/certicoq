@@ -67,7 +67,7 @@ Inductive exp: Type :=
 | Let_e: name -> exp -> exp -> exp
 | Fix_e: efnlst -> N -> exp  (* implicitly lambdas *)
 | Prf_e: exp
-| Prim_val_e : primitive -> exp
+| Prim_val_e : primitive_value -> exp
 | Prim_e: positive -> exp
 with exps: Type :=
 | enil: exps

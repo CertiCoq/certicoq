@@ -16,7 +16,7 @@ Inductive exp_ctx : Type :=
 | Hole_c : exp_ctx
 | Econstr_c : var -> ctor_tag -> list var -> exp_ctx -> exp_ctx
 | Eproj_c  : var -> ctor_tag -> N -> var -> exp_ctx -> exp_ctx
-| Eprim_val_c : var -> primitive -> exp_ctx -> exp_ctx
+| Eprim_val_c : var -> primitive_value -> exp_ctx -> exp_ctx
 | Eprim_c : var -> prim -> list var -> exp_ctx -> exp_ctx
 | Eletapp_c : var -> var -> fun_tag -> list var -> exp_ctx -> exp_ctx
 | Ecase_c : var -> list (ctor_tag * exp) -> ctor_tag ->

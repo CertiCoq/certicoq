@@ -8,6 +8,7 @@ open Metarocq_template_plugin.Ast_quoter
 open ExceptionMonad
 open AstCommon
 open Plugin_utils
+open Caml_nat
 
 let get_stringopt_option key =
   let open Goptions in
@@ -69,11 +70,6 @@ let pr_string s = Pp.str (Caml_bytestring.caml_string_of_bytestring s)
 let nub (xs : 'a list) : 'a list =
   List.fold_right (fun x xs -> if List.mem x xs then xs else x :: xs) xs []
 
-let rec coq_nat_of_int x =
-  match x with
-  | 0 -> Datatypes.O
-  | n -> Datatypes.S (coq_nat_of_int (pred n))
-
 let debug_msg (flag : bool) (s : string) =
   if flag then
     Feedback.msg_debug (Pp.str s)
@@ -81,7 +77,7 @@ let debug_msg (flag : bool) (s : string) =
 
 (* Separate registration of primitive extraction *)
 
-type prim = ((Kernames.kername * Kernames.ident) * bool)
+type prim = ((Kernames.kername * Kernames.ident) * int * bool)
 let global_registers =
   Summary.ref (([], []) : prim list * import list) ~name:"CertiRocq Registration"
 
@@ -164,7 +160,7 @@ let get_global_inductives_constant_mapping () = !global_inductive_constant_regis
 type certirocq_run_function = unit -> Obj.t
 
 let certirocq_run_functions =
-  Summary.ref ~name:"CertiRocq Run Functions Table"
+  Summary.ref ~local:true ~name:"CertiRocq Run Functions Table"
     (CString.Map.empty : certirocq_run_function CString.Map.t)
 
 let certirocq_run_functions_name = "certirocq-run-functions-registration"
@@ -179,18 +175,17 @@ let cache_certirocq_run_function (s, s', fn) =
 let certirocq_run_function_input =
   let open Libobject in
   declare_object
-    (global_object_nodischarge certirocq_run_functions_name
-    ~cache:(fun r -> cache_certirocq_run_function r)
-    ~subst:None)
+    (local_object_nodischarge certirocq_run_functions_name
+    ~cache:(fun r -> cache_certirocq_run_function r))
 
 let register_certirocq_run s s' fn =
-  Feedback.msg_debug Pp.(str"Registering function " ++ str s ++ str " in certirocq_run");
+  (* Feedback.msg_debug Pp.(str"Registering function " ++ str s ++ str " in certirocq_run"); *)
   Lib.add_leaf (certirocq_run_function_input (s, s', fn))
 
 let exists_certirocq_run s =
-  Feedback.msg_debug Pp.(str"Looking up " ++ str s ++ str " in certirocq_run_functions");
+  (* Feedback.msg_debug Pp.(str"Looking up " ++ str s ++ str " in certirocq_run_functions"); *)
   let res = CString.Map.find_opt s !certirocq_run_functions in
-  if Option.is_empty res then Feedback.msg_debug Pp.(str"Not found");
+  (* if Option.is_empty res then Feedback.msg_debug Pp.(str"Not found"); *)
   res
 
 let run_certirocq_run s =
@@ -257,7 +252,7 @@ type options =
     dev       : int;
     prefix    : string;
     toplevel_name : string;
-    prims     : ((Kernames.kername * Kernames.ident) * bool) list;
+    prims     : prim list;
     inductives_mapping : inductives_mapping;
     extracted_inductives : extract_inductives;
   }
@@ -295,7 +290,7 @@ let default_options () : options =
     extracted_inductives = get_global_inductives_constant_mapping ();
   }
 
-let make_options (l : command_args list) (pr : ((Kernames.kername * Kernames.ident) * bool) list) (fname : string) : options =
+let make_options (l : command_args list) (pr : prim list) (fname : string) : options =
   let rec aux (o : options) l =
     match l with
     | [] -> o
@@ -334,7 +329,13 @@ let all_unsafe_passes = make_unsafe_passes true
 let no_unsafe_passes = make_unsafe_passes false
 
 let quote_inductives_mapping l =
-  List.map (fun (hd, (na, cstrs)) -> (hd, (bytestring_of_string na, List.map (fun i -> coq_nat_of_int i) cstrs))) l
+  List.map (fun (hd, (na, cstrs)) -> (hd, (bytestring_of_string na, List.map (fun i -> nat_of_caml_int i) cstrs))) l
+
+let quote_prims l =
+  let open Pipeline_utils in
+  List.map (fun ((x, y), ar, b) -> { prim_name = x; prim_target = y;
+                                     prim_arity = nat_of_caml_int ar;
+                                     prim_alloc = b}) l
 
 let make_pipeline_options (opts : options) =
   let erasure_config =
@@ -347,16 +348,17 @@ let make_pipeline_options (opts : options) =
         })
   in
   let cps    = opts.cps in
-  let args = coq_nat_of_int opts.args in
-  let olevel = coq_nat_of_int opts.olevel in
+  let args = nat_of_caml_int opts.args in
+  let olevel = nat_of_caml_int opts.olevel in
   let timing = opts.time in
   let timing_anf = opts.time_anf in
   let debug  = opts.debug in
-  let anfc = coq_nat_of_int opts.anf_conf in
-  let dev = coq_nat_of_int opts.dev in
+  let anfc = nat_of_caml_int opts.anf_conf in
+  let dev = nat_of_caml_int opts.dev in
   let prefix = bytestring_of_string opts.prefix in
   let toplevel_name = bytestring_of_string opts.toplevel_name in
   let prims = get_global_prims () @ opts.prims in
+  let prims = quote_prims prims in
   let inductives_mapping = quote_inductives_mapping opts.inductives_mapping in
   (* Feedback.msg_debug Pp.(str"Prims: " ++ prlist_with_sep spc (fun ((x, y), wt) -> str (string_of_bytestring y)) prims); *)
   Pipeline.make_opts erasure_config inductives_mapping cps args anfc olevel timing timing_anf debug dev prefix toplevel_name prims
@@ -408,9 +410,11 @@ module MLCompiler : CompilerInterface with
   type name_env = BasicAst.name Cps.M.t
   let compile = Pipeline.compile
   let printProg prog names (dest : string) (imports : import list) =
-    let imports' = List.map (fun i -> match i with
-      | FromRelativePath s -> "#include \"" ^ s ^ "\""
-      | FromLibrary (s, _) -> "#include <" ^ s ^ ">"
+    let imports' = List.filter_map (fun i -> match i with
+      | FromRelativePath s -> Some ("#include \"" ^ s ^ "\"")
+      | FromLibrary (s, _) -> Some ("#include <" ^ s ^ ">")
+      | LibraryPath _ -> None
+      | Link _ -> None
       | FromAbsolutePath s ->
           failwith "Import with absolute path should have been filled") imports in
     PrintClight.print_dest_names_imports prog (Cps.M.elements names) dest imports'
@@ -606,7 +610,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let compiler = compiler_executable debug in
     let rt_dir = runtime_dir () in
     let cmd =
-        Printf.sprintf "%s -Wno-everything -O2 -fomit-frame-pointer -g -I %s -I %s -c -o %s %s"
+        Printf.sprintf "%s -fPIC -Wno-everything -O2 -fomit-frame-pointer -g -I %s -I %s -c -o %s %s"
           compiler opts.build_dir (Boot.Env.Path.to_string rt_dir) (name ^ ".o") (name ^ ".c")
     in
     let importso =
@@ -618,6 +622,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
         match i with
         | FromAbsolutePath s -> [oname s]
         | FromRelativePath s -> [oname s]
+        | LibraryPath s -> ["-L"; s]
+        | Link s -> ["-l" ^ s]
         | FromLibrary (s, _) -> [make_rt_file (oname s)]) imports) in
       let l = make_rt_file "certirocq_run_main.o" :: imports' in
       String.concat " " l
@@ -627,7 +633,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     match Unix.system cmd with
     | Unix.WEXITED 0 ->
       let linkcmd =
-        Printf.sprintf "%s -Wno-everything -g -L %s -L %s -o %s %s %s %s"
+        Printf.sprintf "%s -fPIC -Wno-everything -g -L %s -L %s -o %s %s %s %s"
           compiler opts.build_dir (Boot.Env.Path.to_string rt_dir) name gc_stack_o (name ^ ".o") importso
       in
       debug_msg debug (Printf.sprintf "Executing command: %s" linkcmd);
@@ -784,6 +790,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
         Constr.mkFloat (Obj.magic v)
       else if Environ.is_int63_type env c then
         Constr.mkInt (Obj.magic v)
+      else if Environ.is_string_type env c then
+        Constr.mkString (Obj.magic v)
       else CErrors.user_err Pp.(str "Unsupported primitive type in CertiRocq reification")
     in aux ty v
 
@@ -818,6 +826,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
     output_string chan (template_ocaml id opts.filename name);
     flush chan; close_out chan; fname
 
+  let c_flags = "-O2 -fomit-frame-pointer -g"
+
   let certirocq_eval_named ~opaque_access opts env sigma c global_id imports =
     let prog = quote_term ~opaque_access opts env sigma c in
     let tyinfo =
@@ -837,8 +847,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let ocamlfind = ocamlfind_executable debug in
     let rt_dir = runtime_dir () in
     let cmd =
-        Printf.sprintf "%s -Wno-everything -O2 -fomit-frame-pointer -g -I %s -I %s -c -o %s %s"
-          compiler opts.build_dir (Boot.Env.Path.to_string rt_dir) (Filename.remove_extension c_driver ^ ".o") c_driver
+        Printf.sprintf "%s -fPIC -Wno-everything %s -I %s -I %s -c -o %s %s"
+          compiler c_flags opts.build_dir (Boot.Env.Path.to_string rt_dir) (Filename.remove_extension c_driver ^ ".o") c_driver
     in
     let importso =
       let oname s =
@@ -849,6 +859,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
         match i with
         | FromAbsolutePath s -> [oname s]
         | FromRelativePath s -> [oname s]
+        | Link s -> ["-cclib"; "-l" ^ s]
+        | LibraryPath s -> ["-cclib"; "-L"; "-cclib"; s]
         | FromLibrary (_, Some s) -> [make_rt_file (oname s)]
         | FromLibrary (s, None) -> [make_rt_file (oname s)]) imports) in
       let l = imports' in
@@ -864,7 +876,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let shared_lib = make_fname opts opts.filename ^ suff ^ ".cmxs" in
     let linkcmd =
       Printf.sprintf "%s ocamlopt -shared -linkpkg -dontlink %s -thread -rectypes -package %s \
-      -I %s -I plugin -o %s %s %s %s %s"
+      -I %s -package rocq-certirocq -o %s %s %s %s %s"
       ocamlfind dontlink pkgs opts.build_dir shared_lib ocaml_driver gc_stack_o
       (make_fname opts opts.filename ^ ".o") importso
     in
@@ -884,10 +896,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     name_rec s
 
   let find_fresh s map =
-    Feedback.msg_debug Pp.(str "Looking for fresh " ++ str s ++ str " in " ++ prlist_with_sep spc str (CString.Set.elements map));
-    let freshs = next_string_away_from s (fun s -> CString.Set.mem s map) in
-    Feedback.msg_debug Pp.(str "Found " ++ str freshs);
-    freshs
+    next_string_away_from s (fun s -> CString.Set.mem s map)
 
   let toplevel_name_of_filename s =
     let comps = CString.split_on_char '.' s in
@@ -943,7 +952,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
       debug_msg debug "Finished compiling, printing to file.";
       let time = Unix.gettimeofday() in
       let suff = opts.ext in
-      let fname = opts.filename in
+      let fname = make_fname opts opts.filename in
       let file = fname ^ suff ^ ".ir" in
       print_to_file (string_of_bytestring prg) file;
       let time = (Unix.gettimeofday() -. time) in

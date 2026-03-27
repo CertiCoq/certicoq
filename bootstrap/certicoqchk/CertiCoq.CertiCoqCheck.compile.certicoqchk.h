@@ -1,0 +1,6 @@
+#ifndef CERTICOQ_CERTICOQCHECK_COMPILE_CERTICOQCHK_H
+#define CERTICOQ_CERTICOQCHECK_COMPILE_CERTICOQCHK_H
+#include <gc_stack.h>
+extern value body(struct thread_info *);
+
+#endif /* CERTICOQ_CERTICOQCHECK_COMPILE_CERTICOQCHK_H */

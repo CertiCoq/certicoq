@@ -901,7 +901,7 @@ Section ANF_Val.
     forall k, anf_cvt_alpha_equiv_statement k.
   Proof.
     intros k. induction k as [k IHk] using lt_wf_rec1.
-    unfold anf_cvt_alpha_equiv_statement.
+    Check exp_ind_alt_2.
     eapply exp_ind_alt_2.
     - (* Var_e *)
       intros n C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2

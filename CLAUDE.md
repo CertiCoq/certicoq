@@ -12,6 +12,10 @@ If `make` fails with "No rule to make target `.Makefile.d'", regenerate:
 cd theories && coq_makefile -f _CoqProject -o Makefile
 ```
 
+### Reading compilation output
+- **Never suppress output** with `grep`, `head`, `tail`, or pipes when debugging errors. These can hide the exact error line, the error message, or the `Show.` output. Always use `make ... 2>&1 | cat` or just `make ...` to see the full output.
+- Error messages from Coq include the file, line number, and character range. Always read these to understand where the failure is.
+
 ## Rocq/Coq Proof Guidelines
 
 ### Never Guess
@@ -23,8 +27,23 @@ cd theories && coq_makefile -f _CoqProject -o Makefile
 - **Never use tactics blindly**: always understand what each tactic does and why it is applicable.
 
 ### Debugging Tactics
-- Use `Set Printing All.` before a failing tactic to see fully explicit terms with all implicit arguments and notations expanded. 
+- Use `Set Printing All.` before a failing tactic to see fully explicit terms with all implicit arguments and notations expanded.
 - When `eapply` or `apply` fails with unification errors, the printed-all output reveals the actual types.
+- **`Show.` to inspect proof state**: Place `Show.` followed by `admit.` at the point you want to inspect. The ENTIRE file must compile (not just up to that point) — `Show.` is a command, not a tactic. ALL goals in the proof must be closed (remaining ones with `admit`, the lemma with `Admitted`). Compile with `make` and read the output. Example:
+  ```coq
+  - intros. Show. admit.   (* see goal after intros *)
+  - admit.                  (* close remaining goals *)
+  ...
+  Admitted.
+  ```
+  When compiling to read `Show.` output, do NOT use `grep`, `head`, `tail` or pipes — they can hide the output. Use `make ... 2>&1 | cat` or plain `make`.
+- **`inv`/`inversion`/`destruct` on large mutual inductives** (like `anf_cvt_rel`, `eval_env_fuel`) can hang Coq for 54+ minutes. Instead use `remember` + `destruct`:
+  ```coq
+  remember (EAst.tXxx arg1 arg2) as e_x.
+  destruct Hcvt; try discriminate.
+  injection Heqe_x as <- <-.
+  ```
+  WARNING: `injection ... as <- <-` may clear hypotheses. Save critical ones with `rename H into Hsaved` BEFORE injection.
 
 ### Proof Style
 - **Think before writing**: understand the proof structure before writing tactics. Don't blindly copy old proofs — understand then adapt.

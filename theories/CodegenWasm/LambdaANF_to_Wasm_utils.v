@@ -4,7 +4,7 @@ From compcert Require Import
 
 From CertiRocq Require Import
   LambdaANF.term LambdaANF.eval LambdaANF.term_util
-  LambdaANF.List_util LambdaANF.identifiers
+  LambdaANF.List_util LambdaANF.identifiers LambdaANF.Ensembles_util
   CodegenWasm.LambdaANF_to_Wasm
   CodegenWasm.LambdaANF_to_Wasm_restrictions
   CodegenWasm.LambdaANF_to_Wasm_primitives
@@ -15,6 +15,7 @@ From Wasm Require Import
   instantiation_properties opsem properties.
 
 From Stdlib Require Import
+  Sets.Ensembles
   List ListDec
   Logic.Decidable
   Relations.Relations Relations.Relation_Operators
@@ -607,6 +608,139 @@ Proof.
       clear n n0.
       eapply IHl; eassumption.
 Qed.
+
+
+(* ******************************************************************* *)
+(** ** [NoDup] of the collected variables, from [unique_bindings]      *)
+(* ******************************************************************* *)
+
+(** The [seq] [++] of the Wasm libraries and the [List] [++] are convertible
+    but not syntactically equal, so [Ensembles_util]'s [FromList_app] rewrite
+    does not fire on the lists collected below. *)
+Lemma FromList_cat {A} (l1 l2 : list A) :
+  FromList (seq.cat l1 l2) <--> FromList l1 :|: FromList l2.
+Proof. apply FromList_app. Qed.
+
+(** The function names of a block of fundefs, as a list. *)
+Fixpoint fds_fn_names (fds : fundefs) : list term.var :=
+  match fds with
+  | Fnil => []
+  | Fcons f _ _ _ fds' => f :: fds_fn_names fds'
+  end.
+
+Lemma collect_function_vars_Efun : forall fds e,
+  collect_function_vars (Efun fds e) = fds_fn_names fds.
+Proof. intros fds e. induction fds; cbn in *; congruence. Qed.
+
+(** All collected variables are bound. *)
+
+Lemma collect_local_variables_subset : forall e,
+  FromList (collect_local_variables e) \subset bound_var e.
+Proof.
+  induction e using exp_ind'; cbn in *;
+    repeat normalize_bound_var; repeat normalize_sets; eauto with Ensembles_DB.
+Qed.
+
+Local Hint Resolve collect_local_variables_subset : Ensembles_DB.
+
+Lemma fds_collect_local_variables_subset : forall fds,
+  FromList (fds_collect_local_variables fds) \subset bound_var_fundefs fds.
+Proof.
+  induction fds; cbn; repeat normalize_bound_var;
+    rewrite ?FromList_cat; repeat normalize_sets; eauto 20 with Ensembles_DB.
+Qed.
+
+Lemma fds_fn_names_subset : forall fds,
+  FromList (fds_fn_names fds) \subset bound_var_fundefs fds.
+Proof.
+  induction fds; cbn; repeat normalize_bound_var; repeat normalize_sets;
+    eauto 20 with Ensembles_DB.
+Qed.
+
+Local Hint Resolve fds_collect_local_variables_subset fds_fn_names_subset
+  : Ensembles_DB.
+
+Lemma fds_collect_local_variables_fn_names_subset : forall fds,
+  FromList (seq.cat (fds_collect_local_variables fds) (fds_fn_names fds))
+  \subset bound_var_fundefs fds.
+Proof. intros fds. rewrite FromList_cat. eauto 20 with Ensembles_DB. Qed.
+
+Local Hint Resolve fds_collect_local_variables_fn_names_subset : Ensembles_DB.
+
+(** [NoDup] of the collected variables. *)
+
+Lemma NoDup_collect_local_variables : forall e,
+  unique_bindings e -> NoDup (collect_local_variables e).
+Proof.
+  intros e. induction e using exp_ind'; intros Hub; inv Hub; cbn in *;
+    (* the binder cases: [x :: collect_local_variables e] *)
+    try (constructor;
+         [ match goal with H : ~ bound_var _ _ |- _ =>
+             intros Hin; apply H; now apply collect_local_variables_subset end
+         | now eauto ]);
+    (* [Eapp], [Ehalt], [Ecase _ []] *)
+    try now constructor.
+  - (* Ecase, cons *)
+    apply List_util.NoDup_app; eauto.
+    eapply Disjoint_Included;
+      [ apply (collect_local_variables_subset (Ecase v l))
+      | apply (collect_local_variables_subset e)
+      | eassumption ].
+  - (* Efun *) now eauto.
+Qed.
+
+Lemma NoDup_fds_collect_local_variables : forall fds,
+  unique_bindings_fundefs fds ->
+  NoDup (fds_collect_local_variables fds ++ fds_fn_names fds).
+Proof.
+  induction fds as [ f ft ys e fds' IH | ]; intros Hub; inv Hub; cbn;
+    [| now constructor ].
+  (* [f] occurs nowhere else, so split it off from the middle *)
+  apply (proj2 (NoDup_Add (Add_app f ((ys ++ collect_local_variables e)
+                                        ++ fds_collect_local_variables fds')
+                                     (fds_fn_names fds')))).
+  split.
+  - rewrite <- catA. apply List_util.NoDup_app.
+    + apply List_util.NoDup_app;
+        [ assumption | now apply NoDup_collect_local_variables | ].
+      eapply Disjoint_Included_r;
+        [ apply collect_local_variables_subset | now apply Disjoint_sym ].
+    + now apply IH.
+    + eapply Disjoint_Included_r;
+        [ apply fds_collect_local_variables_fn_names_subset | ].
+      rewrite FromList_cat. apply Union_Disjoint_l.
+      * now apply Disjoint_sym.
+      * eapply Disjoint_Included_l;
+          [ apply collect_local_variables_subset | assumption ].
+  - intros Hin.
+    assert (Hsub : FromList ((ys ++ collect_local_variables e)
+                             ++ fds_collect_local_variables fds'
+                             ++ fds_fn_names fds')
+                   \subset FromList ys :|: (bound_var e :|: bound_var_fundefs fds')).
+    { rewrite !FromList_cat.
+      apply Union_Included; [ apply Union_Included | apply Union_Included ];
+        eauto 20 with Ensembles_DB. }
+    rewrite <- catA in Hin. apply Hsub in Hin.
+    inv Hin; [| inv H ]; contradiction.
+Qed.
+
+Lemma unique_bindings_NoDup_collect : forall e,
+  unique_bindings e ->
+  NoDup (collect_all_local_variables e ++ collect_function_vars e).
+Proof.
+  intros e Hub. destruct e; rewrite ?collect_function_vars_Efun;
+    cbn [collect_all_local_variables collect_function_vars]; rewrite ?cats0;
+    try now apply NoDup_collect_local_variables.
+  (* Efun *)
+  inv Hub. rewrite <- catA. apply List_util.NoDup_app.
+  - now apply NoDup_collect_local_variables.
+  - now apply NoDup_fds_collect_local_variables.
+  - eapply Disjoint_Included;
+      [ apply fds_collect_local_variables_fn_names_subset
+      | apply collect_local_variables_subset
+      | eassumption ].
+Qed.
+
 
 End Vars.
 

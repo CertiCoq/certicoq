@@ -134,7 +134,7 @@ Lemma load_field_unfold :
     = INSTR_Load val_ty
         (ptr_ty,
          OP_GetElementPtr val_ty
-           (ptr_ty, OP_Conversion Inttoptr val_ty (nvar env y) ptr_ty)
+           (ptr_ty, OP_Conversion (CONV_Impure Inttoptr) val_ty (nvar env y) ptr_ty)
            [(val_ty, lit (N.to_nat n))]) [].
 Proof. reflexivity. Qed.
 

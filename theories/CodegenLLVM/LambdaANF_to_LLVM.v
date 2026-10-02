@@ -115,7 +115,7 @@ Definition is_fun (fs : list positive) (v : var) : bool :=
     here.  Non-functions are ordinary SSA locals. *)
 Definition gvar (fs : list positive) (env : nenv) (v : var) : Lexp :=
   if is_fun fs v
-  then OP_Conversion Ptrtoint (TYPE_Pointer None)
+  then OP_Conversion (CONV_Impure Ptrtoint) (TYPE_Pointer None)
          (EXP_Ident (ID_Global (Anon (Zpos v)))) val_ty
   else nvar env v.
 
@@ -125,7 +125,7 @@ Definition gvar (fs : list positive) (env : nenv) (v : var) : Lexp :=
 Definition gcallee (fs : list positive) (env : nenv) (f : var) : Lexp :=
   if is_fun fs f
   then EXP_Ident (ID_Global (Anon (Zpos f)))
-  else OP_Conversion Inttoptr val_ty (nvar env f) (TYPE_Pointer None).
+  else OP_Conversion (CONV_Impure Inttoptr) val_ty (nvar env f) (TYPE_Pointer None).
 
 (** [Val_long n = (n << 1) | 1]. *)
 Definition val_long (n : Lexp) : Lexp :=
@@ -142,7 +142,7 @@ Definition is_block (v : Lexp) : Lexp :=
 (** Address of field [n] of a boxed value: [gep i64, (inttoptr v), n]. *)
 Definition gep_field (base : Lexp) (n : N) : Lexp :=
   OP_GetElementPtr val_ty
-    (ptr_ty, OP_Conversion Inttoptr val_ty base ptr_ty)
+    (ptr_ty, OP_Conversion (CONV_Impure Inttoptr) val_ty base ptr_ty)
     [(val_ty, lit (N.to_nat n))].
 
 (** [Field(y, n)]: load the n-th field of the block held in [y]. *)
@@ -168,11 +168,12 @@ Definition gep_tinfo (n : nat) : Lexp :=
 
 (** Deterministic fresh SSA temporaries for the alloc/call lowering.  Real ANF
     variables serialise as [Raw (Zpos v)]; generated temporaries use [Raw (Zneg
-    _)], so the two name-spaces never collide.  Keyed off a seed [positive] times
-    sixteen, giving fifteen disjoint slots per seed — enough for the GC-safepoint
-    block's several temporaries. *)
+    _)], so the two name-spaces never collide.  The negative names are split by
+    their residue mod 4: [ntmp] uses [-(4n)], [ssname] uses [-(4n+1)] and
+    [Flatten.flat_id] uses [-(4n+2)].  [ntmp] is keyed off a seed [positive]
+    times sixteen, giving fifteen disjoint slots per seed. *)
 Definition ntmp (seed : positive) (k : positive) : raw_id :=
-  Raw (Zneg (seed * 16 + k)).
+  Raw (Zneg ((seed * 16 + k)~0~0)).
 
 (** Call argument list: [%tinfo] first, then the value args [ys].  Args that are
     themselves top-level functions ([fs]) are passed as global code pointers. *)
@@ -212,7 +213,7 @@ Definition header_word (get_ord get_arity : ctor_tag -> N) (t : ctor_tag) : Lexp
 (** Load the header word of a boxed value: [load (inttoptr (y - 8))]. *)
 Definition load_header (env : nenv) (y : var) : Linstr :=
   INSTR_Load val_ty
-    (ptr_ty, OP_Conversion Inttoptr val_ty
+    (ptr_ty, OP_Conversion (CONV_Impure Inttoptr) val_ty
        (OP_IBinop (Sub false false) val_ty (nvar env y) (lit 8)) ptr_ty) [].
 
 (** ** Block plumbing *)
@@ -237,11 +238,14 @@ Definition prepend_code (extra : Lcode) (blks : list (block typ)) : list (block 
     [stack_frame] in the (dominating, once-per-activation) check block, spill the
     live set on the collect path, link the frame, collect, reload, pop, and merge
     the original vs.\ reloaded values with a phi at the alloc block.  The
-    continuation then reads the dominating phi results.  Fresh names live in a
-    high [Zneg] range keyed off the safepoint seed, disjoint from ANF variables
-    ([Zpos]), the [ntmp] temporaries ([seed*16+k]) and the flattener ([16*c]). *)
+    continuation then reads the dominating phi results.  Fresh names are
+    [-(4 c + 1)] for [c] the Cantor pairing of the safepoint seed and the slot
+    [k], so they are pairwise distinct and disjoint from ANF variables ([Zpos]),
+    the [ntmp] temporaries ([-(4n)]) and the flattener ([-(4n+2)]). *)
+Definition cantor (a b : N) : N := ((a + b) * (a + b + 1)) / 2 + b.
+
 Definition ssname (seed : positive) (k : nat) : raw_id :=
-  Raw (Zneg (seed * 4294967296 + Pos.of_succ_nat k)).
+  Raw (Zneg (N.succ_pos (cantor (Npos seed) (N.of_nat k)))~0~1).
 
 (** [stack_frame] = [{ value* next; value* root; stack_frame* prev }]. *)
 Definition frame_ty : typ := TYPE_Struct [tinfo_ty; tinfo_ty; tinfo_ty].
@@ -377,7 +381,7 @@ Fixpoint translate_cfg (get_ord get_arity : ctor_tag -> N)
                       (ptr_ty, gep_at a0e 0) [], [])
                 :: (IId vpn, INSTR_Op (gep_at a0e 1), [])
                 :: store_fields fs env vpe 0 ys
-                ++ (IId (Raw (Zpos x)), INSTR_Op (OP_Conversion Ptrtoint ptr_ty vpe val_ty), [])
+                ++ (IId (Raw (Zpos x)), INSTR_Op (OP_Conversion (CONV_Impure Ptrtoint) ptr_ty vpe val_ty), [])
                 :: (IId naen, INSTR_Op (gep_at a0e nwords), [])
                 :: (IVoid 7%Z, INSTR_Store (ptr_ty, EXP_Ident (ID_Local naen)) (ptr_ty, allocp) [], [])
                 :: [] )%list in
@@ -420,8 +424,8 @@ Fixpoint translate_cfg (get_ord get_arity : ctor_tag -> N)
                 (IId limitRn, INSTR_Load ptr_ty (ptr_ty, limitp) [], []);
                 (IId availRn,
                  INSTR_Op (OP_IBinop (Sub false false) val_ty
-                            (OP_Conversion Ptrtoint ptr_ty limitR val_ty)
-                            (OP_Conversion Ptrtoint ptr_ty allocR val_ty)), []);
+                            (OP_Conversion (CONV_Impure Ptrtoint) ptr_ty limitR val_ty)
+                            (OP_Conversion (CONV_Impure Ptrtoint) ptr_ty allocR val_ty)), []);
                 (IId cmpRn,
                  INSTR_Op (OP_ICmp false Uge val_ty availR (lit (8 * cwn))), []) ]
               (IVoid 2%Z,
@@ -456,7 +460,7 @@ Fixpoint translate_cfg (get_ord get_arity : ctor_tag -> N)
                 :: (IId vpn, INSTR_Op (gep_at a0e 1), [])
                 :: store_fields fs env'' vpe 0 ys
                 ++ (IId (Raw (Zpos x)),
-                    INSTR_Op (OP_Conversion Ptrtoint ptr_ty vpe val_ty), [])
+                    INSTR_Op (OP_Conversion (CONV_Impure Ptrtoint) ptr_ty vpe val_ty), [])
                 :: (IId naen, INSTR_Op (gep_at a0e nwords), [])
                 :: (IVoid 7%Z, INSTR_Store (ptr_ty, EXP_Ident (ID_Local naen)) (ptr_ty, allocp) [], [])
                 :: [] )%list)

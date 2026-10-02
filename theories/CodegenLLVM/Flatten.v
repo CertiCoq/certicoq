@@ -9,17 +9,16 @@
     with a fresh SSA name, yielding a program whose printed [.ll] parses and
     links.
 
-    Fresh names are [Raw (Zneg (16*c))].  The emitter's own temporaries are
-    [Raw (Zneg (seed*16+k))] with [k >= 1] (see [LambdaANF_to_LLVM.ntmp]), so
-    multiples of sixteen are disjoint from them; real ANF variables are
-    [Raw (Zpos _)].  Every fresh name is therefore distinct from any name the
-    emitter produces. *)
+    Fresh names are [Raw (Zneg c~1~0)], i.e. [-(4c+2)].  The emitter's own
+    temporaries are [-(4n)] ([LambdaANF_to_LLVM.ntmp]) and [-(4n+1)]
+    ([LambdaANF_to_LLVM.ssname]); real ANF variables are [Raw (Zpos _)].  Every
+    fresh name is therefore distinct from any name the emitter produces. *)
 
 From Vellvm Require Import Syntax.LLVMAst.
 From Stdlib Require Import BinNums BinPos List.
 Import ListNotations.
 
-Definition flat_id (c : positive) : raw_id := Raw (Zneg (16 * c)).
+Definition flat_id (c : positive) : raw_id := Raw (Zneg c~1~0).
 
 (** [atomize e c] returns [(extra, a, c')] where [a] is an atomic expression
     (register or literal) denoting [e], [extra] is the code that computes it, and

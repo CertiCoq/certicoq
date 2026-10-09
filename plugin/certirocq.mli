@@ -90,6 +90,8 @@ module CompileFunctor (CI : CompilerInterface) : sig
                 options -> Names.GlobRef.t -> unit
   val compile_wasm : opaque_access:Global.indirect_accessor ->
                     options -> Names.GlobRef.t -> unit
+  val compile_llvm : opaque_access:Global.indirect_accessor ->
+                    options -> Names.GlobRef.t -> unit
   val ffi_command : opaque_access:Global.indirect_accessor ->
                     options -> Names.GlobRef.t -> unit
   val glue_command : opaque_access:Global.indirect_accessor -> options -> Names.GlobRef.t list -> unit
@@ -102,6 +104,7 @@ val generate_glue_only : opaque_access:Global.indirect_accessor -> options -> Na
 val compile_C : opaque_access:Global.indirect_accessor -> options -> Names.GlobRef.t -> import list -> unit
 val show_ir : opaque_access:Global.indirect_accessor -> options -> Names.GlobRef.t -> unit
 val compile_wasm : opaque_access:Global.indirect_accessor -> options -> Names.GlobRef.t -> unit
+val compile_llvm : opaque_access:Global.indirect_accessor -> options -> Names.GlobRef.t -> unit
 val ffi_command : opaque_access:Global.indirect_accessor -> options -> Names.GlobRef.t -> unit
 val glue_command : opaque_access:Global.indirect_accessor -> options -> Names.GlobRef.t list -> unit
 val eval_gr : opaque_access:Global.indirect_accessor -> options -> Names.GlobRef.t -> import list -> Constr.t

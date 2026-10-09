@@ -1059,20 +1059,29 @@ Proof.
   apply memS_runs_c_bind_inv in H. destruct H as (st1 & pr & H1 & H2).
   apply memS_runs_c_choose_inv in H1. cbn [choose_step] in H1.
   apply memS_runs_c_ret_inv in H1. destruct H1 as [-> ->].
-  change (memS_runs_c _ (Allocate_bytes_with_pr _ _ _) _ _) in H2.
+  change (memS_runs_c {| state_memory_stack := state_memory_stack st;
+                         state_provenance := next_provenance (state_provenance st) |}
+            (Allocate_bytes_with_pr (concat_acc (repeatN n (generate_poison_bytes t))) align
+               (next_provenance (state_provenance st))) st' p) in H2.
   apply Allocate_runs in H2. destruct H2 as (Ep & Eprov & _ & ptrs & Eg & Est).
+  change (mem_of {| state_memory_stack := state_memory_stack st;
+                    state_provenance := next_provenance (state_provenance st) |}) with (mem_of st) in *.
+  change (frames_of {| state_memory_stack := state_memory_stack st;
+                       state_provenance := next_provenance (state_provenance st) |}) with (frames_of st) in *.
+  change (heap_of {| state_memory_stack := state_memory_stack st;
+                     state_provenance := next_provenance (state_provenance st) |}) with (heap_of st) in *.
   pose proof (allocate_dtyp_bytes_length t n) as L.
   set (init := concat_acc (repeatN n (generate_poison_bytes t))) in *.
   rewrite N_length_nat, L, N2Nat.id in Eg.
   apply gcp_spec in Eg. destruct Eg as [Lp C].
   destruct (add_all_to_frame_parts ptrs
               {| Memory_stack_memory :=
-                   add_all_index_acc (memory_bytes_to_bytes (provenance_to_allocation_id pr) init)
+                   add_all_index_acc (memory_bytes_to_bytes (provenance_to_allocation_id (next_provenance (state_provenance st))) init)
                      (ptr_to_int p) (mem_of st);
                  Memory_stack_frame_stack := frames_of st;
                  Memory_stack_heap := heap_of st |}) as (M1 & M2 & M3).
   rewrite <- Est in M1, M2, M3. cbn [Memory_stack_memory Memory_stack_heap Memory_stack_frame_stack] in M1, M2, M3.
-  assert (Lb : length (memory_bytes_to_bytes (provenance_to_allocation_id pr) init) =
+  assert (Lb : length (memory_bytes_to_bytes (provenance_to_allocation_id (next_provenance (state_provenance st))) init) =
                N.to_nat (n * sizeof_dtyp t)).
   { unfold memory_bytes_to_bytes. rewrite map_acc_eq, length_map. exact L. }
   split; [exact M2|]. split; [exists ptrs; auto|]. split; [exact Ep|].
@@ -1081,12 +1090,12 @@ Proof.
   - intros a Ha. unfold mem_of at 1. rewrite M1. apply add_all_index_acc_out.
     rewrite Lb, N_nat_Z. lia.
   - intros q Hq Hr.
-    destruct (add_all_index_acc_in (memory_bytes_to_bytes (provenance_to_allocation_id pr) init)
+    destruct (add_all_index_acc_in (memory_bytes_to_bytes (provenance_to_allocation_id (next_provenance (state_provenance st))) init)
                 (ptr_to_int p) (mem_of st) (ptr_to_int q)) as (v & Hin & E);
       [rewrite Lb, N_nat_Z; lia|].
     unfold memory_bytes_to_bytes in Hin. rewrite map_acc_eq in Hin.
     apply in_map_iff in Hin. destruct Hin as (b & <- & _).
-    exists (provenance_to_allocation_id pr). split.
+    exists (provenance_to_allocation_id (next_provenance (state_provenance st))). split.
     + unfold aid_at, mem_of. rewrite M1. rewrite E. reflexivity.
     + rewrite Hq, Eprov. cbn. rewrite N.eqb_refl. reflexivity.
 Qed.

@@ -58,6 +58,13 @@ Proof.
   rewrite <- Zmod_div_mod; try lia; try reflexivity. exists (2^63). reflexivity.
 Qed.
 
+Lemma int_and1023 a : @Integers.and 64 (Integers.repr a) (Integers.repr 1023) = Integers.repr (a mod 1024).
+Proof.
+  unfold Integers.and. rewrite !unsigned_repr64. change (1023 mod 2^64) with 1023.
+  change 1023 with (Z.ones 10). rewrite Z.land_ones by lia. change (2^10) with 1024.
+  rewrite <- Zmod_div_mod; try lia; try reflexivity. exists (2^54). reflexivity.
+Qed.
+
 Lemma int_sub a b : @Integers.sub 64 (Integers.repr a) (Integers.repr b) = Integers.repr (a - b).
 Proof.
   unfold Integers.sub. rewrite !unsigned_repr64. apply repr_eq64.
@@ -110,6 +117,24 @@ Proof. unfold I64. cbn -[Z.mul Z.add Integers.or]. rewrite int_or1_even. reflexi
 
 Lemma eval_and1 a : eval_iop And (I64 a) (I64 1) = EOU.raise_ret (I64 (a mod 2)).
 Proof. unfold I64. cbn -[Z.modulo Integers.and]. rewrite int_and1. reflexivity. Qed.
+
+(** The tag of a header word sits in its low 10 bits. *)
+Lemma eval_and1023 a : eval_iop And (I64 a) (I64 1023) = EOU.raise_ret (I64 (a mod 1024)).
+Proof. unfold I64. cbn -[Z.modulo Integers.and]. rewrite int_and1023. reflexivity. Qed.
+
+(** [header_word]: [(ga << 10) | go], so its low 10 bits are [go] when [go < 1024]. *)
+Lemma header_word_tag (ga go : nat) :
+  (go < 1024)%nat -> Z.of_nat (Nat.lor (Nat.shiftl ga 10) go) mod 1024 = Z.of_nat go.
+Proof.
+  intros Hgo. change 1024 with (Z.of_nat 1024). rewrite <- Nat2Z.inj_mod. f_equal.
+  change 1024%nat with (2 ^ 10)%nat in *.
+  apply Nat.bits_inj. intros i.
+  rewrite <- (Nat.mod_small go (2 ^ 10)) at 2 by exact Hgo.
+  destruct (Nat.lt_ge_cases i 10) as [Hi|Hi].
+  - rewrite !Nat.mod_pow2_bits_low by exact Hi. rewrite Nat.lor_spec, Nat.shiftl_spec_low by exact Hi.
+    reflexivity.
+  - rewrite !Nat.mod_pow2_bits_high by exact Hi. reflexivity.
+Qed.
 
 Lemma eval_ashr1 a :
   eval_iop (AShr false) (I64 a) (I64 1) = EOU.raise_ret (I64 (@Integers.signed 64 (Integers.repr a) / 2)).
@@ -393,6 +418,14 @@ Section Forms.
     - apply exp_eval_lit64.
     - rewrite eval_icmp_eq. rewrite (Z.mod_small (z mod 2)) by (pose proof (Z.mod_pos_bound z 2); lia).
       reflexivity.
+  Qed.
+
+  (** The tag of a header: [e & 1023]. *)
+  Lemma exp_eval_and1023 t e z :
+    EE (Some i64) e (I64 z) ->
+    EE t (OP_IBinop And i64 e (elit 1023)) (I64 (z mod 1024)).
+  Proof.
+    intros H. eapply exp_eval_ibinop; [exact H|apply exp_eval_lit64|apply eval_and1023].
   Qed.
 
   Lemma exp_eval_sub t e1 e2 a b :

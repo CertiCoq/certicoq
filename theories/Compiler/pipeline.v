@@ -183,6 +183,6 @@ let (perr, log) := run_pipeline _ _ opts p pipeline_Wasm in
 Definition compile_LLVM (opts : Options) (p : Template.Ast.Env.program) : (error string * string) :=
 let (perr, log) := run_pipeline _ _ opts p pipeline_LLVM in
   match perr with
-  | Ret p => (Ret (String.parse (serialize_program p)), log)
+  | Ret p => (Ret (serialize_bytestring p), log)
   | Err s => (Err s, log)
   end.

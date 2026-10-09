@@ -306,6 +306,20 @@ LambdaANF_to_Wasm_primitives
 LambdaANF_to_Wasm
 Toplevel3
 
+ListUtil
+LLVMAst
+AstLib
+DList
+DecimalString
+HexadecimalString
+StringUtil
+ShowAST
+Traversal
+Flatten
+LambdaANF_to_LLVM
+Serialize
+Toplevel4
+
 Glue_utils
 Glue
 Ffi

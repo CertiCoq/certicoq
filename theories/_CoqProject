@@ -128,7 +128,7 @@ CodegenLLVM/Flatten.v
 CodegenLLVM/LambdaANF_to_LLVM.v
 CodegenLLVM/Serialize.v
 CodegenLLVM/toplevel.v
-# CodegenLLVM — correctness statement against Vellvm's semantics, and proof (in progress)
+# CodegenLLVM — correctness statement against Vellvm's semantics, and its proof
 # (see LLVM_PROOF.md at the repository root)
 CodegenLLVM/CertiGC_Contract.v
 CodegenLLVM/LambdaANF_to_LLVM_statement.v
@@ -136,12 +136,22 @@ CodegenLLVM/LLVM_interp_lemmas.v
 CodegenLLVM/LLVM_call_lemmas.v
 CodegenLLVM/LLVM_convert.v
 CodegenLLVM/LLVM_exp_lemmas.v
+CodegenLLVM/LLVM_mem_lemmas.v
+CodegenLLVM/LLVM_emit_syntax.v
+CodegenLLVM/LLVM_emit_facts.v
+CodegenLLVM/LLVM_instr_lemmas.v
+CodegenLLVM/Flatten_sem.v
 CodegenLLVM/LLVM_sim.v
+CodegenLLVM/LLVM_toplevel_link.v
+CodegenLLVM/LLVM_sim_cases_read.v
+CodegenLLVM/LLVM_sim_cases_constr.v
+CodegenLLVM/LLVM_sim_cases_call.v
+CodegenLLVM/LLVM_sim_exp.v
+CodegenLLVM/LLVM_nonvacuity.v
+CodegenLLVM/LLVM_nonvacuity_run.v
 # Not built: earlier proofs of PR #155 (vacuous, and written against an older
 # Vellvm API): MemoryLaws.v LambdaANF_to_LLVM_correct_v3.v Construct_lemmas.v
 # Flatten_correct.v Instantiate_compile.v
-# Not built: unfinished work in progress: LLVM_mem_lemmas.v LLVM_emit_syntax.v
-# Flatten_sem.v
 
 # Glue
 Glue/glue_utils.v

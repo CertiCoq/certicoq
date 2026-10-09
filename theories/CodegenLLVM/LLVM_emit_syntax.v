@@ -1115,7 +1115,10 @@ Definition tle_name (t : toplevel_entity typ (block typ * list (block typ))) : o
 Lemma funs_to_defs_names go ga po fs fds :
   map (fun d => tle_name (TLE_Definition d)) (funs_to_defs go ga po fs fds) =
   map (fun f => Some (Anon (Zpos f))) (fun_ids fds).
-Proof. induction fds; simpl; auto. rewrite mk_fun_name, IHfds. reflexivity. Qed.
+Proof.
+  induction fds as [f ft xs e rest IH|]; [|reflexivity].
+  cbn [funs_to_defs fun_ids map]. rewrite IH. unfold tle_name at 1. rewrite mk_fun_name. reflexivity.
+Qed.
 
 Lemma compile_prog_names go ga po e :
   map tle_name (compile_prog go ga po e) =
@@ -1124,8 +1127,8 @@ Lemma compile_prog_names go ga po e :
   | _ => [Some (Name "certirocq_main")]
   end.
 Proof.
-  destruct e; simpl; try (rewrite mk_fun_name; reflexivity).
-  rewrite map_app, map_map, funs_to_defs_names. simpl. rewrite mk_fun_name. reflexivity.
+  destruct e; unfold compile_prog; try (cbn [map tle_name]; rewrite mk_fun_name; reflexivity).
+  rewrite map_app, map_map, funs_to_defs_names. cbn [map tle_name]. rewrite mk_fun_name. reflexivity.
 Qed.
 
 Lemma compile_prog_names_nodup go ga po fds main :
@@ -1166,7 +1169,7 @@ Proof.
       try (destruct Hin as [<-|[]]; do 4 eexists; reflexivity).
     apply in_app_iff in Hin as [Hin|[<-|[]]]; [|do 4 eexists; reflexivity].
     apply in_map_iff in Hin as (d & <- & Hd).
-    destruct (funs_to_defs_in _ _ _ _ _ _ Hd) as (f & ft & ps & bd & _ & -> & _).
+    destruct (funs_to_defs_in _ _ _ _ _ _ Hd) as (g & gt & ps & bd & _ & -> & _).
     do 4 eexists; reflexivity. }
   do 4 eexists. split; [reflexivity|]. apply mk_fun_ok.
 Qed.

@@ -101,11 +101,11 @@ Codegen/toplevel.v
 
 # CodegenWasm
 CodegenWasm/LambdaANF_to_Wasm_restrictions.v
-CodegenWasm/LambdaANF_to_Wasm_primitives.v
+CodegenWasm/LambdaANF_to_Wasm_primints.v
 CodegenWasm/LambdaANF_to_Wasm.v
 CodegenWasm/LambdaANF_to_Wasm_utils.v
 CodegenWasm/LambdaANF_to_Wasm_correct.v
-CodegenWasm/LambdaANF_to_Wasm_primitives_correct.v
+CodegenWasm/LambdaANF_to_Wasm_primints_correct.v
 CodegenWasm/LambdaANF_to_Wasm_typing.v
 CodegenWasm/LambdaANF_to_Wasm_instantiation.v
 CodegenWasm/toplevel.v

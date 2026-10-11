@@ -15,7 +15,7 @@ From CertiRocq Require Import
   LambdaANF.term
   LambdaANF.cps_show
   CodegenWasm.LambdaANF_to_Wasm_restrictions
-  CodegenWasm.LambdaANF_to_Wasm_primitives.
+  CodegenWasm.LambdaANF_to_Wasm_primints.
 
 From MetaRocq.Utils Require Import bytestring MRString.
 

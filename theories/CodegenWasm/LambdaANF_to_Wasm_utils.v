@@ -7,7 +7,7 @@ From CertiRocq Require Import
   LambdaANF.List_util LambdaANF.identifiers
   CodegenWasm.LambdaANF_to_Wasm
   CodegenWasm.LambdaANF_to_Wasm_restrictions
-  CodegenWasm.LambdaANF_to_Wasm_primitives
+  CodegenWasm.LambdaANF_to_Wasm_primints
   Libraries.maps_util.
 
 From Wasm Require Import

@@ -13,7 +13,7 @@ From CertiRocq Require Import
   CodegenWasm.LambdaANF_to_Wasm
   CodegenWasm.LambdaANF_to_Wasm_utils
   CodegenWasm.LambdaANF_to_Wasm_correct
-  CodegenWasm.LambdaANF_to_Wasm_primitives
+  CodegenWasm.LambdaANF_to_Wasm_primints
   CodegenWasm.LambdaANF_to_Wasm_restrictions.
 
 From MetaRocq Require Import Common.Kernames.
@@ -1640,7 +1640,7 @@ Proof with eassumption.
           [:: AI_basic (BI_relop T_i64 (Relop_i (ROI_ge SX_U)))] ++
           [:: AI_basic (BI_if (BT_valtype None)
                 ([:: BI_global_get glob_tmp4] ++
-                 [:: BI_const_num (LambdaANF_to_Wasm_primitives.Z_to_i64val_co 1)] ++
+                 [:: BI_const_num (LambdaANF_to_Wasm_primints.Z_to_i64val_co 1)] ++
                  [:: BI_binop T_i64 (Binop_i BOI_or)] ++
                  [:: BI_global_set glob_tmp4] ++
                  [:: BI_global_get glob_tmp1] ++

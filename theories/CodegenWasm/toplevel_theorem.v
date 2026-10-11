@@ -11,7 +11,7 @@ From CertiRocq Require Import
   CodegenWasm.LambdaANF_to_Wasm
   CodegenWasm.LambdaANF_to_Wasm_utils
   CodegenWasm.LambdaANF_to_Wasm_correct
-  CodegenWasm.LambdaANF_to_Wasm_primitives_correct
+  CodegenWasm.LambdaANF_to_Wasm_primints_correct
   CodegenWasm.LambdaANF_to_Wasm_instantiation
   CodegenWasm.LambdaANF_to_Wasm_restrictions.
 

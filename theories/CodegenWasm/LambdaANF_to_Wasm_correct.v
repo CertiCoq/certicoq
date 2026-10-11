@@ -28,7 +28,7 @@ From CertiRocq Require Import
   CodegenWasm.LambdaANF_to_Wasm
   CodegenWasm.LambdaANF_to_Wasm_utils
   CodegenWasm.LambdaANF_to_Wasm_restrictions
-  CodegenWasm.LambdaANF_to_Wasm_primitives.
+  CodegenWasm.LambdaANF_to_Wasm_primints.
 
 From MetaRocq Require Import Common.Kernames.
 
@@ -3697,7 +3697,7 @@ Definition fds_restricted fds := forall a t ys e,
   (forall x, occurs_free e x -> In x ys \/ find_def x fds <> None) /\
   NoDup (ys ++ collect_local_variables e ++ collect_function_vars (Efun fds e)).
 
-(* This is assumed here, the proof was moved to LambdaANF_to_Wasm_primitives_correct.v *)
+(* This is assumed here, the proof was moved to LambdaANF_to_Wasm_primints_correct.v *)
 Definition primitive_operation_reduces pfs : Prop :=
   forall lenv state s f fds f' (x : var) (x' : localidx) (p : prim) op_name str b op_arr op
          (ys : list var) (e : exp) (vs : list val) (rho : env) (v : val) instrs mem,

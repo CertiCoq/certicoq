@@ -275,38 +275,6 @@ Proof.
     do 3 f_equal. lia.
 Qed.
 
-Lemma translate_fvar_fname_mapping_aux : forall fds e f i n env,
-  (forall x j, env ! x = Some j -> j < N.of_nat (numOf_fundefs fds) + n)%N ->
-  (create_var_mapping n (collect_function_vars (Efun fds e)) env) ! f = Some i ->
-  (i < N.of_nat (numOf_fundefs fds) + n)%N.
-Proof.
-  induction fds; intros.
-  - remember (numOf_fundefs (Fcons v f l e fds)) as len.
-    cbn in Heqlen. destruct len=>//.
-    cbn in H0. rename H0 into Hf.
-    destruct (var_dec f0 v).
-    + (* f0=v *)
-      subst f0. rewrite M.gss in Hf. inv Hf. lia.
-    + (* f0<>v *)
-      cbn in Hf. rewrite M.gso in Hf; auto.
-      apply IHfds in Hf. injection Heqlen as ->. cbn. destruct n; try lia.
-      assumption. intros.
-      apply H in H0. cbn in H0. destruct n; lia.
-  - inv H0. now eapply H.
-Qed.
-
-Lemma translate_fvar_fname_mapping : forall e f errMsg i,
-  translate_var nenv (create_fname_mapping e) f errMsg = Ret i ->
-  match e with Efun fds _ => N.to_nat i < numOf_fundefs fds + num_custom_funs | _ => True end.
-Proof.
-  intros. unfold create_fname_mapping, translate_var in H.
-  destruct ((create_var_mapping (N.of_nat num_custom_funs) (collect_function_vars e)
-         (M.empty _)) ! f) eqn:Hf; rewrite Hf in H; inv H.
-  destruct e; auto. rename f0 into fds.
-  apply translate_fvar_fname_mapping_aux in Hf. lia.
-  intros. inv H.
-Qed.
-
 Lemma translate_functions_exists_original_fun : forall fds fds'' fns wasmFun e eAny fenv,
   NoDup (collect_function_vars (Efun fds e)) ->
   translate_functions nenv cenv fenv penv fds = Ret fns ->

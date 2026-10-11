@@ -28,7 +28,6 @@ Import seq.
 Section TOPLEVEL.
 
 Variable cenv:LambdaANF.term.ctor_env.
-Variable funenv:LambdaANF.term.fun_env.
 Variable nenv : LambdaANF.cps_show.name_env.
 Variable penv : LambdaANF.toplevel.prim_env.
 
@@ -67,7 +66,7 @@ Theorem LambdaANF_Wasm_related :
     reduce_trans (hs, sr,  (Build_frame [] (f_inst fr)), [ AI_basic (BI_call main_function_idx) ])
                  (hs, sr', (Build_frame [] (f_inst fr)), [])    /\
     (* result variable has the correct value set *)
-    result_val_LambdaANF_Wasm cenv fenv nenv penv v sr' (f_inst fr).
+    result_val_LambdaANF_Wasm cenv fenv penv v sr' (f_inst fr).
 Proof.
   intros ???????? HprimFunsRet HprimFunsRelated Hcenv HcenvRestr HvarsNodup Hfreevars Hstep LANF2Wasm.
   assert (exists fds e', e = Efun fds e') as [fds [e' ->]]. {
@@ -115,11 +114,11 @@ Proof.
   remember (create_fname_mapping (Efun fds e)) as fenv.
 
    assert (HlocInBound: (forall (var : positive) (varIdx : funcidx),
-          repr_var (lenv:=lenv) nenv var varIdx -> N.to_nat varIdx < Datatypes.length (f_locs f_before_IH))).
+          repr_var (lenv:=lenv) var varIdx -> N.to_nat varIdx < Datatypes.length (f_locs f_before_IH))).
    { intros ? ? Hvar. subst f_before_IH. cbn. rewrite repeat_length. inv Hvar.
      eapply var_mapping_list_lt_length. eassumption. }
 
-  assert (Hinv_before_IH: INV fenv nenv sr f_before_IH). {
+  assert (Hinv_before_IH: INV fenv sr f_before_IH). {
     subst f_before_IH fenv.
     now eapply init_locals_preserves_INV with (args:=[]).
   }
@@ -209,7 +208,7 @@ Proof.
     by eapply NoDup_app_In in H; eauto.
   }
 
-  assert (Hfds : fds_translated_correctly cenv fenv nenv penv fds sr (f_inst f_before_IH)). {
+  assert (Hfds : fds_translated_correctly cenv fenv penv fds sr (f_inst f_before_IH)). {
     intros ???? Hcontra.
     assert (Hc: find_def a fds <> None) by congruence.
     apply HfVal in Hc; auto.
@@ -219,7 +218,7 @@ Proof.
     congruence.
   }
 
-  assert (HrelE : @rel_env_LambdaANF_Wasm cenv fenv nenv penv
+  assert (HrelE : @rel_env_LambdaANF_Wasm cenv fenv penv
                    _ _ (create_local_variable_mapping (collect_local_variables e)) e (def_funs fds fds (M.empty _) (M.empty _))
           sr f_before_IH fds). {
     split.
@@ -246,14 +245,14 @@ Proof.
   remember ({| f_locs := [::]; f_inst := f_inst fr |}) as frameInit.
 
   subst lenv.
-  assert (Hassms : bs_wasm_assumptions cenv fenv nenv penv pfs fds). {
-    split. exact (primitive_operation_reduces_proof cenv fenv nenv penv _ HprimFunsRelated).
+  assert (Hassms : bs_wasm_assumptions cenv fenv penv pfs fds). {
+    split. exact (primitive_operation_reduces_proof cenv fenv penv _ HprimFunsRelated).
     split. exact HcenvRestr.
     split. exact HprimFunsRet.
     split. exact HfenvWf.
     exact HfdsRestr.
   }
-  have HMAIN := repr_bs_LambdaANF_Wasm_related cenv fenv nenv penv _ _ Hassms
+  have HMAIN := repr_bs_LambdaANF_Wasm_related cenv fenv penv _ _ Hassms
                   _ _ _ _ Hstep Hnodup'' HfenvRho HeRestr' Hunbound
                   _ frameInit _ lh _ HlenvInjective HenvsDisjoint
                   hs sr _ _ Hfds HlocInBound Hinv_before_IH HmemAvail Hexpr HrelE.

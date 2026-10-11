@@ -476,14 +476,21 @@ Proof.
     destruct (find_def f fds); auto. exfalso. now apply H1.
 Qed.
 
-Lemma var_mapping_list_lt_length' {nenv} : forall l loc loc' err_str n,
-  translate_var nenv (create_var_mapping n l (M.empty _)) loc err_str = Ret loc' ->
+(* [translate_var] inspects the mapping and nothing else: when the lookup
+   succeeds the error message is irrelevant. *)
+Lemma translate_var_Ret {nenv} : forall lenv x err i,
+  translate_var nenv lenv x err = Ret i <-> lenv ! x = Some i.
+Proof.
+  intros. unfold translate_var.
+  destruct (lenv ! x) as [n|]; split; intro Heq; now inv Heq.
+Qed.
+
+Lemma var_mapping_list_lt_length' : forall l loc loc' n,
+  (create_var_mapping n l (M.empty _)) ! loc = Some loc' ->
   N.to_nat loc' < length l + N.to_nat n.
 Proof.
-  intros ? ? ? ? ? H.
-  unfold translate_var in H.
-  destruct (create_var_mapping n l (M.empty _)) ! loc eqn:Heqn; rewrite Heqn in H; inv H.
-  generalize dependent loc. revert loc' err_str n.
+  intros ? ? ? ? Heqn.
+  generalize dependent loc. revert loc' n.
   induction l; intros. inv Heqn.
   destruct (var_dec loc a).
   (* loc = a *) subst. cbn in Heqn. rewrite Maps.PTree.gss in Heqn. inv Heqn. cbn. lia.
@@ -492,17 +499,17 @@ Proof.
   eapply IHl; eauto.
 Qed.
 
-Lemma var_mapping_list_lt_length {nenv} : forall l loc loc' err_str,
-  translate_var nenv (create_local_variable_mapping l) loc err_str = Ret loc' ->
+Lemma var_mapping_list_lt_length : forall l loc loc',
+  (create_local_variable_mapping l) ! loc = Some loc' ->
   N.to_nat loc' < length l.
 Proof.
   intros. apply var_mapping_list_lt_length' in H. lia.
 Qed.
 
-Lemma var_mapping_list_lt_length_nth_error_idx {nenv} : forall l i n x err,
+Lemma var_mapping_list_lt_length_nth_error_idx : forall l i n x,
   NoDup l ->
   lookup_N l i = Some x ->
-  translate_var nenv (create_var_mapping n l (M.empty _)) x err = Ret (n + i)%N.
+  (create_var_mapping n l (M.empty _)) ! x = Some (n + i)%N.
 Proof.
   induction l; intros.
   - unfold lookup_N in H0.
@@ -511,15 +518,14 @@ Proof.
     + (* x=a *)
       subst. unfold lookup_N in H0.
       destruct (N.to_nat i) eqn:Hi.
-      * cbn. unfold translate_var. rewrite M.gss. f_equal. lia.
+      * cbn. rewrite M.gss. f_equal. lia.
       * cbn in H0. apply nth_error_In in H0.
         apply NoDup_cons_iff in H. now destruct H.
     + (* x<> a *)
-      (* cbn. rewrite M.gso; auto. cbn. *)
       unfold lookup_N in H0. destruct i; cbn in H0; first by inv H0.
       destruct (Pos.to_nat p) eqn:Hp; try lia. cbn in H0.
       replace (n + N.pos p)%N with (N.succ n + N.of_nat n1)%N by lia.
-      cbn. unfold translate_var. rewrite M.gso; auto.
+      cbn. rewrite M.gso; auto.
       inv H. apply IHl; auto.
       rewrite -H0. unfold lookup_N. f_equal. lia.
 Qed.

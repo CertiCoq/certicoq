@@ -242,7 +242,7 @@ Definition translate_primitive_value (p : AstCommon.primitive_value) : error Was
 
 (* **** TRANSLATE PRIMITIVE OPERATIONS **** *)
 
-(* actual translation in _primitives file *)
+(* actual translation in [LambdaANF_to_Wasm_primints.v] file *)
 Definition translate_primitive_operation (nenv : name_env) (lenv : localvar_env) (p : primitive) (args : list var) : error (list basic_instruction) :=
   let op_name := p.(prim_name) in
   match KernameMap.find op_name primop_map with

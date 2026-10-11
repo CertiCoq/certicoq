@@ -3732,34 +3732,28 @@ Definition primitive_operation_reduces pfs : Prop :=
                |} /\
       repr_val_LambdaANF_Wasm v s' (f_inst f') wal).
 
-(* GENERALIZED CORRECTNESS THEOREM *)
-Theorem repr_bs_LambdaANF_Wasm_related :
-  (* rho is environment containing outer fundefs. e is body of LambdaANF program *)
-  forall lenv pfs (rho : eval.env) (v : term.val) (e : exp) (memAvail : N) (n : nat) (vars : list term.var) (fds : fundefs)
-                               fAny k (lh : lholed k),
-    primitive_operation_reduces pfs ->
-    cenv_restricted cenv ->
-    (* restrictions on prim_funs env *)
-    prim_funs_env_returns_no_funvalues pfs ->
+(* The main correctness theorem below is proved by induction on [bstep_e].  The
+   per-constructor lemmas and the induction hypotheses all share this statement. *)
+Definition bs_wasm_related (fds : fundefs) (rho : eval.env) (e : exp) (v : term.val) : Prop :=
+  (* bound vars globally unique *)
+  NoDup ((collect_local_variables e) ++ (collect_function_vars (Efun fds e))%list) ->
+
+  (* find_def a fds <> None, rho ! a imply fn value *)
+  (forall (a : positive) (v : term.val), rho ! a = Some v -> find_def a fds <> None ->
+           v = Vfun (M.empty term.val) fds a) ->
+
+  (* restricts size of e so all vars fit in i32s *)
+  expression_restricted cenv e ->
+
+  (* SSA form, let-bound vars not assigned yet *)
+  (forall x, In x (collect_local_variables e) -> rho ! x = None) ->
+
+  forall (k : nat) (fAny : frame) (memAvail : N) (lh : lholed k) lenv,
+
     (* restrictions on lenv, fenv *)
     map_injective lenv ->
     domains_disjoint lenv fenv ->
-    (* bound vars globally unique *)
-    vars = (collect_local_variables e) ++ (collect_function_vars (Efun fds e))%list ->
-    NoDup vars ->
-    (* fenv maps f vars to the index of the corresponding wasm function *)
-    (forall f, (exists res, find_def f fds = Some res) <-> (exists i, fenv ! f = Some i)) ->
-    (* find_def a fds <> None, rho ! a imply fn value *)
-    (forall (a : positive) (v : term.val), rho ! a = Some v -> find_def a fds <> None ->
-             v = Vfun (M.empty term.val) fds a) ->
 
-    (* restricts size of e so all vars fit in i32s *)
-    expression_restricted cenv e ->
-    fds_restricted fds ->
-
-    (* SSA form, let-bound vars not assigned yet *)
-    (forall x, In x (collect_local_variables e) -> rho ! x = None) ->
-    bstep_e pfs cenv rho e v n ->  (* e n-steps to v *)
     forall (hs : host_state) (sr : store_record) (f : frame) (e' : list basic_instruction),
 
       (* translated fds in sr *)
@@ -3789,13 +3783,31 @@ Theorem repr_bs_LambdaANF_Wasm_related :
                          repr_val_LambdaANF_Wasm val sr' (f_inst f') wal) /\
         (* INV holds if program will continue to run *)
         (INV_glob_out_of_mem_is_zero sr' f' -> INV sr' f').
+
+(* Assumptions of the main theorem that are fixed along the induction. *)
+Definition bs_wasm_assumptions pfs fds : Prop :=
+  primitive_operation_reduces pfs
+  /\ cenv_restricted cenv
+  /\ prim_funs_env_returns_no_funvalues pfs
+  (* fenv maps f vars to the index of the corresponding wasm function *)
+  /\ (forall f, (exists res, find_def f fds = Some res) <-> (exists i, fenv ! f = Some i))
+  /\ fds_restricted fds.
+
+Lemma bs_wasm_related_Econstr : forall pfs fds,
+  bs_wasm_assumptions pfs fds ->
+  forall (x : term.var) (t : term.ctor_tag) (ys : list term.var) (e : exp)
+         (rho rho' : eval.env) (vs : list term.val) (v : term.val) (c : nat),
+    get_list ys rho = Some vs ->
+    M.set x (Vconstr t vs) rho = rho' ->
+    bstep_e pfs cenv rho' e v c ->
+    bs_wasm_related fds rho' e v ->
+    bs_wasm_related fds rho (Econstr x t ys e) v.
 Proof with eauto.
-  intros lenv pfs rho v e memAvail n _ fds fAny k lh HprimOpReduce HcenvRestr HprimFunsRet
-    HlenvInjective HenvsDisjoint -> Hnodup HfenvWf HfenvRho HeRestr HfdsRestr Hunbound Hev.
-  generalize dependent lenv. generalize dependent lh. revert k fAny memAvail.
-  induction Hev; intros k fAny mem lh lenv HlenvInjective HenvsDisjoint state sr fr instructions
-                        Hfds HlocInBound Hinv HmemAvail Hrepr_e HrelE.
-  - (* Econstr *)
+  intros pfs fds [HprimOpReduce [HcenvRestr [HprimFunsRet [HfenvWf HfdsRestr]]]]
+    x t ys e rho rho' vs v c H H0 Hev IHHev.
+  intros Hnodup HfenvRho HeRestr Hunbound.
+  intros k fAny mem lh lenv HlenvInjective HenvsDisjoint state sr fr instructions
+         Hfds HlocInBound Hinv HmemAvail Hrepr_e HrelE.
     inversion Hrepr_e.
     inversion H13.
     { (* boxed constructor *)
@@ -4185,7 +4197,24 @@ Proof with eauto.
       subst f_before_IH.
       by repeat (split; auto).
     }
-  - (* Eproj: let x := proj_n y in e *)
+  Unshelve. all: try assumption; try apply ""%bs.
+Qed.
+
+Lemma bs_wasm_related_Eproj : forall pfs fds,
+  bs_wasm_assumptions pfs fds ->
+  forall (t : term.ctor_tag) (vs : list term.val) (v : term.val) (rho : eval.env)
+         (x : term.var) (n : N) (y : term.var) (e : exp) (ov : term.val) (c : nat),
+    M.get y rho = Some (Vconstr t vs) ->
+    nthN vs n = Some v ->
+    bstep_e pfs cenv (M.set x v rho) e ov c ->
+    bs_wasm_related fds (M.set x v rho) e ov ->
+    bs_wasm_related fds rho (Eproj x t n y e) ov.
+Proof with eauto.
+  intros pfs fds [HprimOpReduce [HcenvRestr [HprimFunsRet [HfenvWf HfdsRestr]]]]
+    t vs v rho x n y e ov c H H0 Hev IHHev.
+  intros Hnodup HfenvRho HeRestr Hunbound.
+  intros k fAny mem lh lenv HlenvInjective HenvsDisjoint state sr fr instructions
+         Hfds HlocInBound Hinv HmemAvail Hrepr_e HrelE.
     { inv Hrepr_e.
       rename H9 into Hx', H10 into Hy'.
 
@@ -4356,7 +4385,25 @@ Proof with eauto.
        apply rt_refl. apply Hred. }
      subst f_before_IH. by repeat (split; auto).
     }
-  - (* Ecase *)
+  Unshelve. all: try assumption; try apply ""%bs.
+Qed.
+
+Lemma bs_wasm_related_Ecase : forall pfs fds,
+  bs_wasm_assumptions pfs fds ->
+  forall (y : term.var) (v : term.val) (e : exp) (t : term.ctor_tag)
+         (cl : list (term.ctor_tag * exp)) (vl : list term.val) (rho : eval.env) (c : nat),
+    M.get y rho = Some (Vconstr t vl) ->
+    caseConsistent cenv cl t ->
+    findtag cl t = Some e ->
+    bstep_e pfs cenv rho e v c ->
+    bs_wasm_related fds rho e v ->
+    bs_wasm_related fds rho (Ecase y cl) v.
+Proof with eauto.
+  intros pfs fds [HprimOpReduce [HcenvRestr [HprimFunsRet [HfenvWf HfdsRestr]]]]
+    y v e t cl vl rho c H H0 H1 Hev IHHev.
+  intros Hnodup HfenvRho HeRestr Hunbound.
+  intros k fAny mem lh lenv HlenvInjective HenvsDisjoint state sr fr instructions
+         Hfds HlocInBound Hinv HmemAvail Hrepr_e HrelE.
     {
       intros.
       assert (caseConsistent cenv cl t). { assumption. }
@@ -4545,7 +4592,27 @@ Proof with eauto.
       split. apply HvalPres.
       apply H_INV.
     }
-  - (* Eapp *)
+  Unshelve. all: try assumption; try apply ""%bs.
+Qed.
+
+Lemma bs_wasm_related_Eapp : forall pfs fds,
+  bs_wasm_assumptions pfs fds ->
+  forall (rho' : eval.env) (fl : fundefs) (f' : term.var) (vs : list term.val)
+         (xs : list term.var) (e : exp) (rho'' rho : eval.env) (f : term.var)
+         (t : term.ctor_tag) (ys : list term.var) (v : term.val) (c : nat),
+    M.get f rho = Some (Vfun rho' fl f') ->
+    get_list ys rho = Some vs ->
+    find_def f' fl = Some (t, xs, e) ->
+    set_lists xs vs (def_funs fl fl rho' rho') = Some rho'' ->
+    bstep_e pfs cenv rho'' e v c ->
+    bs_wasm_related fds rho'' e v ->
+    bs_wasm_related fds rho (Eapp f t ys) v.
+Proof with eauto.
+  intros pfs fds [HprimOpReduce [HcenvRestr [HprimFunsRet [HfenvWf HfdsRestr]]]]
+    rho' fl f' vs xs e rho'' rho f t ys v c H H0 H1 H2 Hev IHHev.
+  intros Hnodup HfenvRho HeRestr Hunbound.
+  intros k fAny mem lh lenv HlenvInjective HenvsDisjoint state sr fr instructions
+         Hfds HlocInBound Hinv HmemAvail Hrepr_e HrelE.
     { inv Hrepr_e. rename args' into args_instr.
       assert (HfdsRhoEq: fl = fds /\ rho' = M.empty _). { destruct HrelE as [Hfun1 _]. eapply Hfun1 in H. now destruct H. apply rt_refl. } destruct HfdsRhoEq. subst fl rho'.
       (* treat direct + indirect calls in one *)
@@ -4811,7 +4878,30 @@ Proof with eauto.
     subst f_before_IH. cbn in Hfinst.
     repeat (split; auto).
     }
-  - (* Eletapp *)
+  Unshelve. all: try assumption; try apply ""%bs.
+Qed.
+
+Lemma bs_wasm_related_Eletapp : forall pfs fds,
+  bs_wasm_assumptions pfs fds ->
+  forall (rho' : eval.env) (fl : fundefs) (f' : term.var) (vs : list term.val)
+         (xs : list term.var) (e_body e : exp) (rho'' rho : eval.env)
+         (x f : term.var) (t : term.ctor_tag) (ys : list term.var)
+         (v v' : term.val) (c c' : nat),
+    M.get f rho = Some (Vfun rho' fl f') ->
+    get_list ys rho = Some vs ->
+    find_def f' fl = Some (t, xs, e_body) ->
+    set_lists xs vs (def_funs fl fl rho' rho') = Some rho'' ->
+    bstep_e pfs cenv rho'' e_body v c ->
+    bs_wasm_related fds rho'' e_body v ->
+    bstep_e pfs cenv (M.set x v rho) e v' c' ->
+    bs_wasm_related fds (M.set x v rho) e v' ->
+    bs_wasm_related fds rho (Eletapp x f t ys e) v'.
+Proof with eauto.
+  intros pfs fds [HprimOpReduce [HcenvRestr [HprimFunsRet [HfenvWf HfdsRestr]]]]
+    rho' fl f' vs xs e_body e rho'' rho x f t ys v v' c c' H H0 H1 H2 Hev1 IHHev1 Hev2 IHHev2.
+  intros Hnodup HfenvRho HeRestr Hunbound.
+  intros k fAny mem lh lenv HlenvInjective HenvsDisjoint state sr fr instructions
+         Hfds HlocInBound Hinv HmemAvail Hrepr_e HrelE.
     (* needs 2 IH, first one for the function body (mostly copy paste from Eapp, could be refactored),
                    second one for the continuation, similar to the other cases *)
     { inv Hrepr_e. rename args' into args_instr. rename e into e_cont, x into x_res.
@@ -5319,9 +5409,38 @@ Proof with eauto.
     rewrite Hfinst'.
     by repeat (split; auto).
     }
-  - (* Efun *)
+  Unshelve. all: try assumption; try apply ""%bs.
+Qed.
+
+Lemma bs_wasm_related_Efun : forall pfs fds,
+  bs_wasm_assumptions pfs fds ->
+  forall (rho : eval.env) (fl : fundefs) (e : exp) (v : term.val) (c : nat),
+    bstep_e pfs cenv (def_funs fl fl rho rho) e v c ->
+    bs_wasm_related fds (def_funs fl fl rho rho) e v ->
+    bs_wasm_related fds rho (Efun fl e) v.
+Proof with eauto.
+  intros pfs fds [HprimOpReduce [HcenvRestr [HprimFunsRet [HfenvWf HfdsRestr]]]]
+    rho fl e v c Hev IHHev.
+  intros Hnodup HfenvRho HeRestr Hunbound.
+  intros k fAny mem lh lenv HlenvInjective HenvsDisjoint state sr fr instructions
+         Hfds HlocInBound Hinv HmemAvail Hrepr_e HrelE.
     inv Hrepr_e. (* absurd, fn defs only on topmost level *)
-  - (* Eprim_val *)
+  Unshelve. all: try assumption; try apply ""%bs.
+Qed.
+
+Lemma bs_wasm_related_Eprim_val : forall pfs fds,
+  bs_wasm_assumptions pfs fds ->
+  forall (rho' rho : eval.env) (x : term.var) p (e : exp) (v : term.val) (c : nat),
+    M.set x (Vprim p) rho = rho' ->
+    bstep_e pfs cenv rho' e v c ->
+    bs_wasm_related fds rho' e v ->
+    bs_wasm_related fds rho (Eprim_val x p e) v.
+Proof with eauto.
+  intros pfs fds [HprimOpReduce [HcenvRestr [HprimFunsRet [HfenvWf HfdsRestr]]]]
+    rho' rho x p e v c H Hev IHHev.
+  intros Hnodup HfenvRho HeRestr Hunbound.
+  intros k fAny mem lh lenv HlenvInjective HenvsDisjoint state sr fr instructions
+         Hfds HlocInBound Hinv HmemAvail Hrepr_e HrelE.
     { inv Hrepr_e.
       (* prepare calling memory_grow_reduce *)
       have I := Hinv. destruct I as [_[_[_[Hgmp_w[_[Hmut[_[_[_[HfnsBound[_[_[_[_ [HfuncGrow HfuncsId]]]]]]]]]]]]]]].
@@ -5651,7 +5770,27 @@ Proof with eauto.
         split. auto.
         intro Hcontra. rewrite Hcontra in HoutofM. inv HoutofM. }
     }
-  - (* Eprim *)
+  Unshelve. all: try assumption; try apply ""%bs.
+Qed.
+
+Lemma bs_wasm_related_Eprim : forall pfs fds,
+  bs_wasm_assumptions pfs fds ->
+  forall (vs : list term.val) (rho' rho : eval.env) (x : term.var) (f : term.prim)
+         (f' : list term.val -> option term.val) (ys : list term.var) (e : exp)
+         (v v' : term.val) (c : nat),
+    get_list ys rho = Some vs ->
+    M.get f pfs = Some f' ->
+    f' vs = Some v ->
+    M.set x v rho = rho' ->
+    bstep_e pfs cenv rho' e v' c ->
+    bs_wasm_related fds rho' e v' ->
+    bs_wasm_related fds rho (Eprim x f ys e) v'.
+Proof with eauto.
+  intros pfs fds [HprimOpReduce [HcenvRestr [HprimFunsRet [HfenvWf HfdsRestr]]]]
+    vs rho' rho x f f' ys e v v' c H H0 H1 H2 Hev IHHev.
+  intros Hnodup HfenvRho HeRestr Hunbound.
+  intros k fAny mem lh lenv HlenvInjective HenvsDisjoint state sr fr instructions
+         Hfds HlocInBound Hinv HmemAvail Hrepr_e HrelE.
     { cbn. inv Hrepr_e.
       have I := Hinv. destruct I as [_[_[_[Hgmp_w[_[Hmut[Horglinmem [_[_[HfnsBound[_[_[_[_ [HfuncGrow _]]]]]]]]]]]]]]].
       destruct Horglinmem as [Horgmem1 [orgm [Horgmem2 [orgsize [<- [Horgmem4 Horgmem5]]]]]].
@@ -5817,7 +5956,20 @@ Proof with eauto.
         now apply HvalPreserved.
         intro Hcontra. rewrite Hcontra in HoutofM. inv HoutofM. }
     }
-  - (* Ehalt *)
+  Unshelve. all: try assumption; try apply ""%bs.
+Qed.
+
+Lemma bs_wasm_related_Ehalt : forall pfs fds,
+  bs_wasm_assumptions pfs fds ->
+  forall x v rho,
+    M.get x rho = Some v ->
+    bs_wasm_related fds rho (Ehalt x) v.
+Proof with eauto.
+  intros pfs fds [HprimOpReduce [HcenvRestr [HprimFunsRet [HfenvWf HfdsRestr]]]]
+    x v rho H.
+  intros Hnodup HfenvRho HeRestr Hunbound.
+  intros k fAny mem lh lenv HlenvInjective HenvsDisjoint state sr fr instructions
+         Hfds HlocInBound Hinv HmemAvail Hrepr_e HrelE.
     cbn. inv Hrepr_e. destruct HrelE as [_ [_ Hvar]].
     assert (HfNone: find_def x fds = None). {
       apply HfenvWf_None with (f:=x) in HfenvWf. rewrite HfenvWf.
@@ -5877,7 +6029,28 @@ Proof with eauto.
     intro H_INV.
     eapply update_global_preserves_INV with (i:=glob_result) (num:=(VAL_int32 (wasm_value_to_i32 wal))); eauto=>//.
     cbn; tauto.
-    Unshelve. all: try assumption; try apply ""%bs.
+  Unshelve. all: try assumption; try apply ""%bs.
 Qed.
+
+(* GENERALIZED CORRECTNESS THEOREM *)
+Theorem repr_bs_LambdaANF_Wasm_related : forall pfs fds,
+  bs_wasm_assumptions pfs fds ->
+  forall (rho : eval.env) (e : exp) (v : term.val) (n : nat),
+    bstep_e pfs cenv rho e v n ->
+    bs_wasm_related fds rho e v.
+Proof.
+  intros pfs fds Hassms rho e v n Hev.
+  induction Hev.
+  - eapply bs_wasm_related_Econstr; eassumption.
+  - eapply bs_wasm_related_Eproj; eassumption.
+  - eapply bs_wasm_related_Ecase; eassumption.
+  - eapply bs_wasm_related_Eapp; eassumption.
+  - eapply bs_wasm_related_Eletapp; eassumption.
+  - eapply bs_wasm_related_Efun; eassumption.
+  - eapply bs_wasm_related_Eprim_val; eassumption.
+  - eapply bs_wasm_related_Eprim; eassumption.
+  - eapply bs_wasm_related_Ehalt; eassumption.
+Qed.
+
 
 End MAIN.

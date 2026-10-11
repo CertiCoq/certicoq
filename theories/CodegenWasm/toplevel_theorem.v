@@ -246,10 +246,17 @@ Proof.
   remember ({| f_locs := [::]; f_inst := f_inst fr |}) as frameInit.
 
   subst lenv.
-  have HMAIN := repr_bs_LambdaANF_Wasm_related cenv fenv nenv penv _
-                   _ _ _ _ _ _ _ _ frameInit _ lh (primitive_operation_reduces_proof cenv fenv nenv penv _ HprimFunsRelated) HcenvRestr HprimFunsRet HlenvInjective
-                  HenvsDisjoint Logic.eq_refl Hnodup'' HfenvWf HfenvRho
-                  HeRestr' HfdsRestr Hunbound Hstep hs sr _ _ Hfds HlocInBound Hinv_before_IH HmemAvail Hexpr HrelE.
+  assert (Hassms : bs_wasm_assumptions cenv fenv nenv penv pfs fds). {
+    split. exact (primitive_operation_reduces_proof cenv fenv nenv penv _ HprimFunsRelated).
+    split. exact HcenvRestr.
+    split. exact HprimFunsRet.
+    split. exact HfenvWf.
+    exact HfdsRestr.
+  }
+  have HMAIN := repr_bs_LambdaANF_Wasm_related cenv fenv nenv penv _ _ Hassms
+                  _ _ _ _ Hstep Hnodup'' HfenvRho HeRestr' Hunbound
+                  _ frameInit _ lh _ HlenvInjective HenvsDisjoint
+                  hs sr _ _ Hfds HlocInBound Hinv_before_IH HmemAvail Hexpr HrelE.
   destruct HMAIN as [s' [f' [k' [lh' [Hred [Hval [Hfinst _]]]]]]]. cbn. subst frameInit.
   exists s'. split.
   dostep'. apply r_call. cbn.

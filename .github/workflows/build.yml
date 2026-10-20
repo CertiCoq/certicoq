@@ -38,6 +38,10 @@ jobs:
               opam pin add --yes --no-action \
                 'git+https://github.com/MetaRocq/metarocq.git#c8cd46054518193103c3bb33aa6e15c7f489e72c'
             endGroup
+            startGroup "Unpin coq-wasm"
+              # The image pins coq-wasm to 2.2.0; main requires >= 2.2.1.
+              opam pin remove --yes --no-action coq-wasm
+            endGroup
           before_script: |
             startGroup "Install more dependencies"
               # TODO: install node with apt once a more recent version is available for debian. We need at least version 22.

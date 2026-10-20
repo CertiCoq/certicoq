@@ -821,7 +821,7 @@ Proof.
         assert (Hok' : cfg_ok (Econstr x t ys e') fresh f0 b0)
           by (eapply cfg_ok_weaken; [exact Hok| lia | lia | intros; constructor; auto]).
         eapply cfg_ok_prepend; [exact Hok' | |].
-        -- 
+        --
            intros r Hr. apply alloc_code_defs in Hr as [->|(k & ->)].
            ++ left. eexists; split; [reflexivity|constructor].
            ++ ss_ok.

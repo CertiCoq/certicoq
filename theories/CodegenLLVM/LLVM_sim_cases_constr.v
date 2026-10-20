@@ -679,7 +679,7 @@ Section Jumps.
     assert (Hid : l = blk_id b').
     { rewrite ScopeTheory.ocfg_map_find_block in Hf.
       eapply ScopeTheory.find_block_has_id; exact Hf. }
-    subst l. unfold denote_ocfg. rewrite (LLVM_sim.denote_ocfg_map_unfold' _ _ _ _ _ Hf).
+    subst l. unfold denote_ocfg. rewrite (LLVM_instr_lemmas.denote_ocfg_map_unfold va _ _ _ _ Hf).
     unfold LLVM_sim.tail_of, denote_block. cbn [bind Monad_itree].
     rewrite !Eqit.bind_bind. apply eutt_eq_bind. intros _.
     rewrite !Eqit.bind_bind. apply eutt_eq_bind. intros _.

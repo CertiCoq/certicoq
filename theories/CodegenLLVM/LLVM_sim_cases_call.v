@@ -2257,4 +2257,3 @@ Section CallCases.
   Qed.
 
 End CallCases.
-

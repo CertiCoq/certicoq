@@ -1,6 +1,7 @@
 # End-to-end tests of the LLVM backend (CertiRocq Compile LLVM).
 #
-# Prerequisites (from the repository root, in the opam switch llvm-proof):
+# Prerequisites (from the repository root, in an opam switch with the
+# dependencies of rocq-certirocq.opam, Vellvm included):
 #   make theories/Makefile libraries/Makefile
 #   make -C libraries -j24
 #   make -C theories -j24 Extraction/extraction.vo
@@ -51,7 +52,7 @@
 # compile command appended, and compares against to_sexp prog when SExp.v can
 # print prog's type, else against the "EXPECTED:" line of the file header.
 
-SWITCH ?= llvm-proof
+SWITCH ?= $(shell opam switch show)
 TESTS ?=
 MODES ?=
 

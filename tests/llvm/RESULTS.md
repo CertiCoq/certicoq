@@ -1,7 +1,8 @@
 # LLVM backend: results of the end-to-end harness
 
-Run on 2026-10-07/08, branch `llvm-tests-run` (based on 3fcdab0d), opam switch
-`llvm-proof`, clang on x86-64 Linux (glibc). The commands were:
+Run on 2026-10-07/08 on an unpublished development branch (`llvm-tests-run`,
+based on commit 3fcdab0d), in a Rocq 9.1 switch, with clang on x86-64 Linux
+(glibc). They have not been reproduced on this branch. The commands were:
 
     ./run.sh -m plain -m final-gc -m asan -m O2                 # the 9 tests
     TIMEOUT=3600 ./run.sh -m checked -m asan-checked -m checked-small

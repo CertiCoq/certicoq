@@ -28,7 +28,7 @@ From CertiRocq.Common Require Import AstCommon.
 From CertiRocq.CodegenLLVM Require Import LambdaANF_to_LLVM Flatten
      LambdaANF_to_LLVM_statement LLVM_interp_lemmas LLVM_call_lemmas LLVM_convert
      LLVM_exp_lemmas LLVM_mem_lemmas LLVM_emit_syntax.
-From CertiRocq.CodegenLLVM Require Flatten_sem.
+From CertiRocq.CodegenLLVM Require Flatten_sem LLVM_instr_lemmas.
 From Vellvm Require Syntax.ScopeTheory.
 
 From Vellvm Require Import
@@ -1387,23 +1387,6 @@ Section Simulation.
     ITree.bind (denote_code (blk_code b) va ;; denote_terminator (blk_term b))
                (continue va B (blk_id b)).
 
-  (** Unfolding the block loop at a block in the graph (local version of
-      [LLVM_instr_lemmas.denote_ocfg_map_unfold]). *)
-  Lemma denote_ocfg_map_unfold' bmap va from l (b : LLVMAst.block dtyp) :
-    RM.find l bmap = Some b ->
-    denote_ocfg_map bmap va (from, l)
-    ≈ (bd <- denote_block b from va;;
-       match bd with
-       | inr dv => Ret (inr dv)
-       | inl l' => denote_ocfg_map bmap va (l, l')
-       end).
-  Proof.
-    intros H. unfold denote_ocfg_map at 1. rewrite unfold_iter. cbn. rewrite H.
-    rewrite Eqit.bind_bind. apply eutt_eq_bind. intros [l'|dv]; rewrite Eqit.bind_ret_l.
-    - rewrite tau_eutt. reflexivity.
-    - reflexivity.
-  Qed.
-
   (** Jumping to a phi-free block [b'] of [B] runs its code and terminator
       and continues in [B]. *)
   Lemma denote_ocfg_jump va B from l b' :
@@ -1415,7 +1398,7 @@ Section Simulation.
     assert (Hid : l = blk_id b').
     { rewrite ScopeTheory.ocfg_map_find_block in Hf.
       eapply ScopeTheory.find_block_has_id; exact Hf. }
-    subst l. unfold denote_ocfg. rewrite (denote_ocfg_map_unfold' _ _ _ _ _ Hf).
+    subst l. unfold denote_ocfg. rewrite (LLVM_instr_lemmas.denote_ocfg_map_unfold va _ _ _ _ Hf).
     unfold tail_of, denote_block. rewrite Hp. unfold denote_phis. cbn [map_monad bind ret Monad_itree].
     repeat (rewrite Eqit.bind_ret_l || rewrite Eqit.bind_bind || (progress cbn [map_monad bind ret Monad_itree])).
     unfold continue, denote_ocfg. reflexivity.

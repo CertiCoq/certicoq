@@ -52,14 +52,14 @@
 # meant to collect), except those in NOGC (default c00 c06 c12: they test
 # Ecase dispatch / PrimInt63 ops and allocate less than one nursery).
 #
-# Environment: SWITCH (opam switch, default llvm-proof), CLANG (default clang),
+# Environment: SWITCH (opam switch, default the current one), CLANG (default clang),
 # TIMEOUT (seconds per run, default 300), CERTIROCQ_STACK_MB (see llvm_main.c),
 # LOG_NURSERY (checked-small, default 12), XFAIL (expected failures).
 
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
-SWITCH="${SWITCH:-llvm-proof}"
+SWITCH="${SWITCH:-$(opam switch show)}"
 CLANG="${CLANG:-clang}"
 TIMEOUT="${TIMEOUT:-300}"
 LOG_NURSERY="${LOG_NURSERY:-13}"

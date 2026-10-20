@@ -4,10 +4,14 @@
     [flatten_prog (compile_prog ...)], against Vellvm's executable semantics
     [interp_mcfg] with the concrete memory model and 64-bit pointers.
 
-    The only hypothesis is the runtime contract [runtime_correct]: the
-    garbage collector and the [thread_info] set-up, linked as Vellvm library
-    functions acting on Vellvm's memory.  The theorem is about terminating
-    source runs; divergence is not covered.
+    There are two hypotheses besides the source evaluation [bstep_e]: the
+    runtime contract [runtime_correct] (the garbage collector and the
+    [thread_info] set-up, linked as Vellvm library functions acting on
+    Vellvm's memory), and the source-side restrictions [llvm_restricted]
+    (closed program with unique bindings, no [Eprim], no nested [Efun],
+    bounds on constructor ordinals, arities, projection indices and
+    allocation chunks).  The theorem is about terminating source runs;
+    divergence is not covered.
 
     The statement is [LambdaANF_to_LLVM_correct_statement] at the end of this
     file.  It is proved as [LambdaANF_to_LLVM_correct] in [LLVM_sim_exp.v]. *)

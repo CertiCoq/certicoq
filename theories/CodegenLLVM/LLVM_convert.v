@@ -317,4 +317,3 @@ Lemma conv_def_fields : forall d : Ldef,
   CFG.blks (df_instrs (conv_def d)) = map cblock (fst (df_instrs d) :: snd (df_instrs d)) /\
   CFG.args (df_instrs (conv_def d)) = df_args d.
 Proof. intros; repeat split. Qed.
-

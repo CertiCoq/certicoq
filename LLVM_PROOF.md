@@ -205,8 +205,8 @@ vacuous when its hypotheses cannot hold. The hypotheses that matter:
 
 ## Changes to the emitter (relative to PR #155)
 
-- `LambdaANF_to_LLVM.v`, `Construct_lemmas.v`: `Ptrtoint`/`Inttoptr` are
-  wrapped in `CONV_Impure`, as required by the current Vellvm AST.
+- `LambdaANF_to_LLVM.v`: `Ptrtoint`/`Inttoptr` are wrapped in
+  `CONV_Impure`, as required by the current Vellvm AST.
 - `LambdaANF_to_LLVM.v`, `Flatten.v`: generated local names are disjoint by
   construction. `ntmp` uses `-(4n)`, `ssname` uses `-(4n+1)` with Cantor
   pairing, and `flat_id` uses `-(4n+2)`. Before, they could collide in very
@@ -235,11 +235,11 @@ vacuous when its hypotheses cannot hold. The hypotheses that matter:
 | `LLVM_nonvacuity.v` | The witness runtime and `nv_runtime_correct`, the returning collector `nv_gc_check` and `nv_runtime_correct_check`, the example program (`ex_hypotheses`, `ex_correct`), and the vacuous OOM instance (`oom_runtime_correct`, `oom_runtime_vacuous`) |
 | `LLVM_nonvacuity_run.v` | Symbolic run of the compiled example program (`ex_whole_runs`, `ex_returns`, `ex_not_oom`) |
 
-`MemoryLaws.v`, `LambdaANF_to_LLVM_correct_v3.v`, `Construct_lemmas.v`,
-`Flatten_correct.v` and `Instantiate_compile.v` are PR #155's proofs; they
-are vacuous, do not build against the current Vellvm, and are not in
-`_CoqProject`. `theories/CodegenLLVM/LLIR/` (with its own `_CoqProject`) is
-not in the build either.
+PR #155's earlier proof files (`MemoryLaws.v`,
+`LambdaANF_to_LLVM_correct_v3.v`, `Construct_lemmas.v`, `Flatten_correct.v`,
+`Instantiate_compile.v`), which were vacuous and did not build against the
+current Vellvm, are removed. `theories/CodegenLLVM/LLIR/` (with its own
+`_CoqProject`) is not in the build.
 
 ## Architecture of the proof
 

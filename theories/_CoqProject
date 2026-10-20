@@ -138,9 +138,6 @@ CodegenLLVM/LLVM_sim_cases_call.v
 CodegenLLVM/LLVM_sim_exp.v
 CodegenLLVM/LLVM_nonvacuity.v
 CodegenLLVM/LLVM_nonvacuity_run.v
-# Not built: earlier proofs of PR #155 (vacuous, and written against an older
-# Vellvm API): MemoryLaws.v LambdaANF_to_LLVM_correct_v3.v Construct_lemmas.v
-# Flatten_correct.v Instantiate_compile.v
 
 # Glue
 Glue/glue_utils.v

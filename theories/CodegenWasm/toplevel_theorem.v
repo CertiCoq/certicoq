@@ -47,7 +47,7 @@ Theorem LambdaANF_Wasm_related :
   cenv_restricted cenv ->
 
   (* vars unique (guaranteed by previous stage) *)
-  NoDup ((collect_all_local_variables e) ++ (collect_function_vars e))%list ->
+  unique_bindings e ->
 
   (* expression must be closed *)
   (~ exists x, occurs_free e x ) ->
@@ -69,7 +69,10 @@ Theorem LambdaANF_Wasm_related :
     (* result variable has the correct value set *)
     result_val_LambdaANF_Wasm cenv fenv nenv penv v sr' (f_inst fr).
 Proof.
-  intros ???????? HprimFunsRet HprimFunsRelated Hcenv HcenvRestr HvarsNodup Hfreevars Hstep LANF2Wasm.
+  intros ???????? HprimFunsRet HprimFunsRelated Hcenv HcenvRestr HvarsUniq Hfreevars Hstep LANF2Wasm.
+  assert (HvarsNodup : NoDup ((collect_all_local_variables e) ++ (collect_function_vars e))%list). {
+    apply unique_bindings_NoDup_collect. exact HvarsUniq.
+  }
   assert (exists fds e', e = Efun fds e') as [fds [e' ->]]. {
     unfold LambdaANF_to_Wasm in LANF2Wasm.
     destruct (check_restrictions cenv e)=>//.

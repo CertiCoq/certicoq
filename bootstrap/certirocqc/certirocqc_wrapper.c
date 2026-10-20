@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "gc_stack.h"
+/* OCaml 5.2 defines Hd_val as a function, not a macro. */
+#undef Hd_val
 #include <caml/mlvalues.h>
 #include <caml/memory.h>
 #include <caml/alloc.h>

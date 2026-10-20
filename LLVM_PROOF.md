@@ -87,7 +87,7 @@ and no section hypothesis remains in the theorem.
     arithmetic. The program is closed with unique bindings, and `cenv_ok`
     holds: two distinct constructors of one inductive with the same ordinal
     are one nullary and one boxed. This matches the numbering of
-    `LambdaBoxLocal_to_LambdaANF.convert_cnstrs`, which numbers nullary and
+    `LambdaBox_to_LambdaANF.common.convert_cnstrs`, which numbers nullary and
     boxed constructors with two counters both starting at 0, so that `O` and
     `S` share ordinal 0. The Wasm backend's `cenv_restricted` (in
     `toplevel_theorem.v`) forbids a boxed constructor from sharing its
@@ -306,9 +306,9 @@ backend needs Vellvm's current AST (`Ptrtoint`/`Inttoptr` are
 `Theory/I2F/*`; no Vellvm release contains all of these (the latest,
 `3.0.20260707`, predates `CONV_Impure`). The opam file therefore pins
 `rocq-vellvm` to commit `b63a28a0` (`3.0.20260707-147-gb63a28a0`) with
-`pin-depends`, and the `vellvm/` submodule names the same commit. Once Vellvm
-tags a release that includes it, both are to be replaced by a version
-constraint.
+`pin-depends`; the `vellvm/` submodule and the Nix overlay
+`.nix/coq-overlays/vellvm` name the same commit. Once Vellvm tags a release
+that includes it, the three are to be replaced by a version constraint.
 
 ```sh
 opam pin add -n -y rocq-certirocq .    # also pins rocq-vellvm (pin-depends)

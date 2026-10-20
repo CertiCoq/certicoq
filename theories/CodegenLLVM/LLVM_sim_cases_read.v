@@ -22,7 +22,7 @@ From Stdlib Require Import ZArith NArith List Lia String Program Morphisms Class
 From ITree Require Import ITree Eq.Eqit Interp.InterpFacts Interp.RecursionFacts.
 From ExtLib Require Import Structures.Monads.
 
-From CertiRocq.LambdaANF Require Import cps cps_util eval identifiers List_util set_util.
+From CertiRocq.LambdaANF Require Import term term_util eval identifiers List_util set_util.
 From CertiRocq.Common Require Import AstCommon.
 From CertiRocq.CodegenLLVM Require Import LambdaANF_to_LLVM Flatten
      LambdaANF_to_LLVM_statement LLVM_interp_lemmas LLVM_call_lemmas LLVM_convert
@@ -44,7 +44,7 @@ Open Scope Z_scope.
 Unset Implicit Arguments.
 Set Bullet Behavior "Strict Subproofs".
 
-Local Notation exp := cps.exp.
+Local Notation exp := term.exp.
 
 (* ------------------------------------------------------------------ *)
 (** ** Syntactic helpers *)
@@ -613,7 +613,7 @@ Section CasesRead.
   Hypothesis G_funs : forall f, In f fs -> exists fp, RM.find (Anon (Zpos f)) G = Some (Ptr fp).
   Hypothesis G_gc : exists gp, RM.find (Name "garbage_collect") G = Some (Ptr gp).
 
-  Variable main : cps.exp.
+  Variable main : term.exp.
   Hypothesis Hprog : llvm_restricted cenv fds main.
 
   Notation sim_stmt := (LLVM_sim.sim_stmt cenv prim_of fds heap_inv G ctx tinfo main).

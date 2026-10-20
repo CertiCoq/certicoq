@@ -6,7 +6,7 @@
     or reordered), and the resulting [mcfg] has one declaration and one
     definition per emitted function, each converted pointwise ([conv_def]). *)
 From Stdlib Require Import ZArith NArith List String.
-From CertiRocq.LambdaANF Require Import cps.
+From CertiRocq.LambdaANF Require Import term.
 From CertiRocq.CodegenLLVM Require Import LambdaANF_to_LLVM Flatten LambdaANF_to_LLVM_statement.
 From Vellvm Require Import Syntax Semantics.TopLevel.
 Import ListNotations.
@@ -151,7 +151,7 @@ Qed.
 Notation Ldef := (definition typ (block typ * list (block typ))).
 
 Definition prog_defs (get_ord get_arity : ctor_tag -> N)
-           (prim_of : positive -> option (string * bool)) (e : cps.exp) : list Ldef :=
+           (prim_of : positive -> option (string * bool)) (e : term.exp) : list Ldef :=
   match e with
   | Efun fds main =>
       (funs_to_defs get_ord get_arity prim_of (fun_ids fds) fds

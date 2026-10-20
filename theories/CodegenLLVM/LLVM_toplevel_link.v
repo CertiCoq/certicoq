@@ -20,7 +20,7 @@ From Stdlib Require Import ZArith NArith List Lia String Program Morphisms Permu
 From ITree Require Import ITree Eq.Eqit Interp.InterpFacts Interp.RecursionFacts Events.State Events.StateFacts.
 From ExtLib Require Import Structures.Monads.
 
-From CertiRocq.LambdaANF Require Import cps cps_util eval identifiers.
+From CertiRocq.LambdaANF Require Import term term_util eval identifiers.
 From CertiRocq.Common Require Import AstCommon.
 From CertiRocq.CodegenLLVM Require Import LambdaANF_to_LLVM Flatten
      LambdaANF_to_LLVM_statement LLVM_interp_lemmas LLVM_call_lemmas LLVM_convert
@@ -423,7 +423,7 @@ Section Program.
   Variable cenv : ctor_env.
   Variable prim_of : positive -> option (string * bool).
   Variable fds : fundefs.
-  Variable main : cps.exp.
+  Variable main : term.exp.
   Hypothesis Hnodup : NoDup (fun_ids fds).
 
   Let go := ord_of cenv.
@@ -748,7 +748,7 @@ Section Main_activation.
   Variable cenv : ctor_env.
   Variable prim_of : positive -> option (string * bool).
   Variable fds : fundefs.
-  Variable main : cps.exp.
+  Variable main : term.exp.
   Variable heap_inv : state -> ptr -> Prop.
   Variable G : global_env.
   Variable ctx : CallE ~> itree (CallE +' MCFGEtop).
@@ -771,7 +771,7 @@ Section Main_activation.
   (** The source environment in which [main] runs. *)
   Definition rho_main : eval.env := def_funs fds fds (M.empty _) (M.empty _).
 
-  Variable v : cps.val.
+  Variable v : term.val.
   Hypothesis Hsim : sim_stmt cenv prim_of fds heap_inv G ctx tinfo main rho_main main v.
 
   Theorem main_activation st1 sf0 stk0 :
@@ -1005,7 +1005,7 @@ Definition sim_exp_statement : Prop :=
   (forall f, In f (fun_ids fds) -> exists fp, RM.find (Anon (Zpos f)) G = Some (Ptr fp)) ->
   (* G_gc *)
   (exists gp, RM.find (Name "garbage_collect") G = Some (Ptr gp)) ->
-  forall main : cps.exp,
+  forall main : term.exp,
   (* Hprog *)
   llvm_restricted cenv fds main ->
   forall rho e v n,
@@ -1023,7 +1023,7 @@ Section Whole.
   Variable gc : list dvalue -> MCFGtop (exc + dvalue).
   Variable make_tinfo : MCFGtop dvalue.
   Variable fds : fundefs.
-  Variable main : cps.exp.
+  Variable main : term.exp.
 
   Hypothesis SIM : sim_exp_statement.
   Hypothesis Hrt : runtime_correct cenv fds heap_inv gc make_tinfo.
@@ -1039,7 +1039,7 @@ Section Whole.
     run_program gc make_tinfo (emitted cenv prim_of (Efun fds main)) = interp_mcfg whole initial_fused.
   Proof. unfold run_program. rewrite the_mcfg_eq. reflexivity. Qed.
 
-  Variable v : cps.val.
+  Variable v : term.val.
   Variable n : nat.
   Hypothesis Hev : bstep_e pfs cenv (M.empty _) (Efun fds main) v n.
 

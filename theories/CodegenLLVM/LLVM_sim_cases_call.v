@@ -28,7 +28,7 @@ From Stdlib Require Import ZArith NArith List Lia String Program Morphisms Class
 From ITree Require Import ITree Eq.Eqit Interp.InterpFacts Interp.RecursionFacts.
 From ExtLib Require Import Structures.Monads.
 
-From CertiRocq.LambdaANF Require Import cps cps_util eval identifiers map_util Ensembles_util.
+From CertiRocq.LambdaANF Require Import term term_util eval identifiers map_util Ensembles_util.
 From CertiRocq.Common Require Import AstCommon.
 From CertiRocq.CodegenLLVM Require Import LambdaANF_to_LLVM Flatten
      LambdaANF_to_LLVM_statement LLVM_interp_lemmas LLVM_call_lemmas LLVM_convert
@@ -121,7 +121,7 @@ Section CallCases.
   Hypothesis G_funs : forall f, In f fs -> exists fp, RM.find (Anon (Zpos f)) G = Some (Ptr fp).
   Hypothesis G_gc : exists gp, RM.find (Name "garbage_collect") G = Some (Ptr gp).
 
-  Variable main : cps.exp.
+  Variable main : term.exp.
   Hypothesis Hprog : llvm_restricted cenv fds main.
 
   Notation sim_stmt := (LLVM_sim.sim_stmt cenv prim_of fds heap_inv G ctx tinfo main).
@@ -163,7 +163,7 @@ Section CallCases.
       variable is under its ANF name or an [ssname] with an older seed.
       [env_ok] implies [env_ok2] under [sim_stmt]'s premises
       ([env_ok_env_ok2]). *)
-  Definition env_ok2 (e : cps.exp) (env : nenv) (fresh : positive) : Prop :=
+  Definition env_ok2 (e : term.exp) (env : nenv) (fresh : positive) : Prop :=
     forall y, (bound_var e y -> env y = Raw (Zpos y)) /\
               (env y = Raw (Zpos y) \/ exists s k, (s < fresh)%positive /\ env y = ssname s k).
 
@@ -182,7 +182,7 @@ Section CallCases.
       [apply Flatten_sem.is_flat_pos|apply Flatten_sem.is_flat_ssname].
   Qed.
 
-  Definition sim_stmt_fr (rho : eval.env) (e : cps.exp) (v : cps.val) : Prop :=
+  Definition sim_stmt_fr (rho : eval.env) (e : term.exp) (v : term.val) : Prop :=
     forall env chunk fresh blks f' (B : list (LLVMAst.block dtyp)) va c st sf stk fp rs vs,
       body_ok cenv e ->
       subterm_or_eq e (Efun fds main) ->
@@ -423,7 +423,7 @@ Section CallCases.
   (* ================================================================ *)
   (** ** The callee's frame *)
 
-  Lemma set_lists_frame (R : cps.val -> dvalue -> Prop) xs : forall vs dvs rho0 rho'',
+  Lemma set_lists_frame (R : term.val -> dvalue -> Prop) xs : forall vs dvs rho0 rho'',
     NoDup xs -> set_lists xs vs rho0 = Some rho'' -> Forall2 R vs dvs ->
     forall x, In x xs -> exists v d, M.get x rho'' = Some v /\ R v d /\
       RM.find (Raw (Zpos x)) (fold_right (fun '(x, dv) => Maps.add x dv) Maps.empty

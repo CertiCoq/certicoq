@@ -8,7 +8,7 @@ From Vellvm Require Import Syntax.LLVMAst.
 From Stdlib Require Import ZArith List.
 Require Import Common.Common Common.compM Common.Pipeline_utils.
 Require Import LambdaANF.cps_show LambdaANF.toplevel.
-Require Import LambdaANF.cps.
+Require Import LambdaANF.term.
 Require Import CodegenLLVM.LambdaANF_to_LLVM.   (* compile_prog *)
 Require Import CodegenLLVM.Flatten.              (* flatten_prog *)
 Require Export CodegenLLVM.Serialize.            (* serialize_program *)

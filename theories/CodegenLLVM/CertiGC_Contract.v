@@ -29,7 +29,7 @@ Section CertiGC_Contract.
 
   Variable Mem  : Type.                 (* Vellvm [memory_stack] *)
   Variable Addr : Type.                 (* Vellvm [addr] *)
-  Variable Val  : Type.                 (* source value: [cps.val] *)
+  Variable Val  : Type.                 (* source value: [term.val] *)
 
   (* the shadow-stack roots live in [m], enumerated through [tinfo->fp] *)
   Variable roots_registered : Mem -> Addr (* tinfo *) -> list Addr -> Prop.
@@ -67,7 +67,7 @@ End CertiGC_Contract.
 
 (** To DISCHARGE the GC half of the current [refinement_runs] axiom, instantiate
     the section variables with the Vellvm/proof concretes
-    ([Mem := memory_stack], [Addr := addr], [Val := cps.val],
+    ([Mem := memory_stack], [Addr := addr], [Val := term.val],
     [ReprVal := fun m v a => repr_val_LambdaANF_LLVM … v m (DVALUE_Addr a)], …)
     and assume [CertiGC_spec …] — an assumption BACKED BY CertiGC's VST proof,
     not an unjustified axiom.  The remaining gap to a fully axiom-free result is

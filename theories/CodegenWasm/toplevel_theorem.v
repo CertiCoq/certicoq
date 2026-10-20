@@ -4,14 +4,14 @@ From Stdlib Require Import
 
 From CertiRocq Require Import
   LambdaANF.Ensembles_util
-  LambdaANF.cps
-  LambdaANF.cps_util
+  LambdaANF.term
+  LambdaANF.term_util
   LambdaANF.eval
   LambdaANF.identifiers
   CodegenWasm.LambdaANF_to_Wasm
   CodegenWasm.LambdaANF_to_Wasm_utils
   CodegenWasm.LambdaANF_to_Wasm_correct
-  CodegenWasm.LambdaANF_to_Wasm_primitives_correct
+  CodegenWasm.LambdaANF_to_Wasm_primints_correct
   CodegenWasm.LambdaANF_to_Wasm_instantiation
   CodegenWasm.LambdaANF_to_Wasm_restrictions.
 
@@ -21,14 +21,13 @@ From Wasm Require Import
 Import Lia.
 Import Relations.Relation_Operators.
 Import ssreflect eqtype.
-Import LambdaANF.cps compM.
+Import LambdaANF.term compM.
 Import ListNotations.
 Import seq.
 
 Section TOPLEVEL.
 
-Variable cenv:LambdaANF.cps.ctor_env.
-Variable funenv:LambdaANF.cps.fun_env.
+Variable cenv:LambdaANF.term.ctor_env.
 Variable nenv : LambdaANF.cps_show.name_env.
 Variable penv : LambdaANF.toplevel.prim_env.
 
@@ -36,7 +35,7 @@ Context `{ho : host}.
 
 (* TOPLEVEL CORRECTNESS THEOREM *)
 Theorem LambdaANF_Wasm_related :
-  forall (v : cps.val) (e : exp) (n : nat)
+  forall (v : term.val) (e : exp) (n : nat)
          (hs : host_state) module fenv lenv (pfs : M.t (list val -> option val)),
   (* primitive env well-formed *)
   prim_funs_env_returns_no_funvalues pfs ->
@@ -47,7 +46,7 @@ Theorem LambdaANF_Wasm_related :
   cenv_restricted cenv ->
 
   (* vars unique (guaranteed by previous stage) *)
-  NoDup ((collect_all_local_variables e) ++ (collect_function_vars e))%list ->
+  unique_bindings e ->
 
   (* expression must be closed *)
   (~ exists x, occurs_free e x ) ->
@@ -67,9 +66,12 @@ Theorem LambdaANF_Wasm_related :
     reduce_trans (hs, sr,  (Build_frame [] (f_inst fr)), [ AI_basic (BI_call main_function_idx) ])
                  (hs, sr', (Build_frame [] (f_inst fr)), [])    /\
     (* result variable has the correct value set *)
-    result_val_LambdaANF_Wasm cenv fenv nenv penv v sr' (f_inst fr).
+    result_val_LambdaANF_Wasm cenv fenv penv v sr' (f_inst fr).
 Proof.
-  intros ???????? HprimFunsRet HprimFunsRelated Hcenv HcenvRestr HvarsNodup Hfreevars Hstep LANF2Wasm.
+  intros ???????? HprimFunsRet HprimFunsRelated Hcenv HcenvRestr HvarsUniq Hfreevars Hstep LANF2Wasm.
+  assert (HvarsNodup : NoDup ((collect_all_local_variables e) ++ (collect_function_vars e))%list). {
+    apply unique_bindings_NoDup_collect. exact HvarsUniq.
+  }
   assert (exists fds e', e = Efun fds e') as [fds [e' ->]]. {
     unfold LambdaANF_to_Wasm in LANF2Wasm.
     destruct (check_restrictions cenv e)=>//.
@@ -115,11 +117,11 @@ Proof.
   remember (create_fname_mapping (Efun fds e)) as fenv.
 
    assert (HlocInBound: (forall (var : positive) (varIdx : funcidx),
-          repr_var (lenv:=lenv) nenv var varIdx -> N.to_nat varIdx < Datatypes.length (f_locs f_before_IH))).
+          repr_var (lenv:=lenv) var varIdx -> N.to_nat varIdx < Datatypes.length (f_locs f_before_IH))).
    { intros ? ? Hvar. subst f_before_IH. cbn. rewrite repeat_length. inv Hvar.
      eapply var_mapping_list_lt_length. eassumption. }
 
-  assert (Hinv_before_IH: INV fenv nenv sr f_before_IH). {
+  assert (Hinv_before_IH: INV fenv sr f_before_IH). {
     subst f_before_IH fenv.
     now eapply init_locals_preserves_INV with (args:=[]).
   }
@@ -174,7 +176,7 @@ Proof.
       now apply notNone_Some.
   }
 
-  assert (HfenvRho: (forall (a : positive) (v0 : cps.val),
+  assert (HfenvRho: (forall (a : positive) (v0 : term.val),
        (def_funs fds fds (M.empty _) (M.empty _)) ! a = Some v0 ->
        find_def a fds <> None -> v0 = Vfun (M.empty _) fds a)). {
     intros ? ? H H1. eapply def_funs_find_def in H1; eauto. now erewrite H in H1. }
@@ -209,7 +211,7 @@ Proof.
     by eapply NoDup_app_In in H; eauto.
   }
 
-  assert (Hfds : fds_translated_correctly cenv fenv nenv penv fds sr (f_inst f_before_IH)). {
+  assert (Hfds : fds_translated_correctly cenv fenv penv fds sr (f_inst f_before_IH)). {
     intros ???? Hcontra.
     assert (Hc: find_def a fds <> None) by congruence.
     apply HfVal in Hc; auto.
@@ -219,7 +221,7 @@ Proof.
     congruence.
   }
 
-  assert (HrelE : @rel_env_LambdaANF_Wasm cenv fenv nenv penv
+  assert (HrelE : @rel_env_LambdaANF_Wasm cenv fenv penv
                    _ _ (create_local_variable_mapping (collect_local_variables e)) e (def_funs fds fds (M.empty _) (M.empty _))
           sr f_before_IH fds). {
     split.
@@ -246,10 +248,17 @@ Proof.
   remember ({| f_locs := [::]; f_inst := f_inst fr |}) as frameInit.
 
   subst lenv.
-  have HMAIN := repr_bs_LambdaANF_Wasm_related cenv fenv nenv penv _
-                   _ _ _ _ _ _ _ _ frameInit _ lh (primitive_operation_reduces_proof cenv fenv nenv penv _ HprimFunsRelated) HcenvRestr HprimFunsRet HlenvInjective
-                  HenvsDisjoint Logic.eq_refl Hnodup'' HfenvWf HfenvRho
-                  HeRestr' HfdsRestr Hunbound Hstep hs sr _ _ Hfds HlocInBound Hinv_before_IH HmemAvail Hexpr HrelE.
+  assert (Hassms : bs_wasm_assumptions cenv fenv penv pfs fds). {
+    split. exact (primitive_operation_reduces_proof cenv fenv penv _ HprimFunsRelated).
+    split. exact HcenvRestr.
+    split. exact HprimFunsRet.
+    split. exact HfenvWf.
+    exact HfdsRestr.
+  }
+  have HMAIN := repr_bs_LambdaANF_Wasm_related cenv fenv penv _ _ Hassms
+                  _ _ _ _ Hstep Hnodup'' HfenvRho HeRestr' Hunbound
+                  _ frameInit _ lh _ HlenvInjective HenvsDisjoint
+                  hs sr _ _ Hfds HlocInBound Hinv_before_IH HmemAvail Hexpr HrelE.
   destruct HMAIN as [s' [f' [k' [lh' [Hred [Hval [Hfinst _]]]]]]]. cbn. subst frameInit.
   exists s'. split.
   dostep'. apply r_call. cbn.

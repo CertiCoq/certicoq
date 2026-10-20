@@ -117,8 +117,7 @@ Separate Extraction
          Compiler.pipeline.compile
          Erasure.default_dearging_config
          Glue.glue.generate_glue
-         Glue.ffi.generate_ffi
-         cps.M.elements
+         term.M.elements
          Compiler.pipeline.show_IR.
 
 Recursive Extraction Library Ascii.

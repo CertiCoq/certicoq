@@ -22,7 +22,7 @@
     the existing CertiRocq C runtime ([values.h], [gc_stack.c]) and validated end
     to end by the hand-written LLVM PoCs under [poc/]; see [LOWERING.md]. *)
 
-From CertiRocq.LambdaANF Require Import cps identifiers set_util.
+From CertiRocq.LambdaANF Require Import term identifiers set_util.
 From CertiRocq.Common Require Import AstCommon.   (* primitive_value / primInt / Uint63 *)
 From Vellvm Require Import Syntax.LLVMAst.
 From Stdlib Require Import BinNums BinPos BinNat BinInt List String ZArith.
@@ -310,7 +310,7 @@ Definition safepoint_env (env : nenv) (seed : positive) (roots : list var) : nen
     overhead.  A single [garbage_collect] with [nalloc = chunk_words] guarantees
     the whole chunk fits (CertiGC's contract), so the allocations inside run
     unchecked. *)
-Fixpoint chunk_words (e : cps.exp) : N :=
+Fixpoint chunk_words (e : term.exp) : N :=
   match e with
   | Econstr _ _ ys e' =>
       match ys with
@@ -337,7 +337,7 @@ Fixpoint chunk_words (e : cps.exp) : N :=
 Fixpoint translate_cfg (get_ord get_arity : ctor_tag -> N)
                        (prim_of : positive -> option (string * bool))
                        (fs : list positive)
-                       (env : nenv) (chunk : N) (e : cps.exp) (fresh : positive) {struct e}
+                       (env : nenv) (chunk : N) (e : term.exp) (fresh : positive) {struct e}
   : list (block typ) * positive :=
   match e with
   | Ehalt x =>
@@ -559,7 +559,7 @@ Fixpoint translate_cfg (get_ord get_arity : ctor_tag -> N)
            - [boxed]  : load header, mask 10-bit tag, [switch] over the boxed arms;
            - one block(-chain) per arm, keyed by [get_ord t], partitioned by
              [get_arity t] into the unboxed vs boxed switch. *)
-      let fix arm_loop (arms : list (ctor_tag * cps.exp)) (fr : positive)
+      let fix arm_loop (arms : list (ctor_tag * term.exp)) (fr : positive)
             {struct arms}
             : list (block typ) * list (N * (tint_literal * block_id)) * positive :=
         match arms with
@@ -610,7 +610,7 @@ Fixpoint translate_cfg (get_ord get_arity : ctor_tag -> N)
 
 Definition mk_fun (get_ord get_arity : ctor_tag -> N)
                   (prim_of : positive -> option (string * bool)) (fs : list positive)
-                  (name : function_id) (params : list var) (body : cps.exp)
+                  (name : function_id) (params : list var) (body : term.exp)
   : definition typ (block typ * list (block typ)) :=
   let '(blks, _) := translate_cfg get_ord get_arity prim_of fs base_env 0%N body 1%positive in
   let entry :=
@@ -657,7 +657,7 @@ Fixpoint funs_to_defs (get_ord get_arity : ctor_tag -> N)
   end.
 
 Definition compile_prog (get_ord get_arity : ctor_tag -> N)
-                        (prim_of : positive -> option (string * bool)) (e : cps.exp)
+                        (prim_of : positive -> option (string * bool)) (e : term.exp)
   : list (toplevel_entity typ (block typ * list (block typ))) :=
   match e with
   | Efun fds main =>

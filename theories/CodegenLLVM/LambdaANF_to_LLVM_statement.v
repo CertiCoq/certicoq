@@ -20,7 +20,7 @@ From Stdlib Require Import ZArith NArith List Lia String.
 From ITree Require Import ITree Eq.Eqit.
 From ExtLib Require Import Structures.Monads.
 
-From CertiRocq.LambdaANF Require Import cps cps_util eval identifiers.
+From CertiRocq.LambdaANF Require Import term term_util eval identifiers.
 From CertiRocq.Common Require Import AstCommon.
 From CertiRocq.CodegenLLVM Require Import LambdaANF_to_LLVM Flatten.
 
@@ -53,7 +53,7 @@ Definition arity_of (cenv : ctor_env) (t : ctor_tag) : N :=
 
 (** Same as [LambdaANF_to_LLVM_Wrapper] in [CodegenLLVM/toplevel.v]. *)
 Definition emitted (cenv : ctor_env) (prim_of : positive -> option (string * bool))
-           (e : cps.exp) : LLprog :=
+           (e : term.exp) : LLprog :=
   flatten_prog (compile_prog (ord_of cenv) (arity_of cenv) prim_of e).
 
 (* ------------------------------------------------------------------ *)
@@ -121,7 +121,7 @@ Section Repr.
   Variable genv : global_env.        (* Vellvm's global environment *)
   Variable st : state.               (* Vellvm's memory *)
 
-  Inductive repr_val : cps.val -> Z -> Prop :=
+  Inductive repr_val : term.val -> Z -> Prop :=
   | Repr_unboxed t :
       arity_of cenv t = 0%N ->
       repr_val (Vconstr t []) (Z.of_N (ord_of cenv t) * 2 + 1)
@@ -139,7 +139,7 @@ Section Repr.
       RawIdMaps.rid_lookup (Anon (Zpos f)) genv
         = Some (DVALUE_Base (DVALUE_Pointer fp)) ->
       repr_val (Vfun rho fds f) (ptr_to_int fp)
-  with repr_fields : list cps.val -> ptr -> Z -> Prop :=
+  with repr_fields : list term.val -> ptr -> Z -> Prop :=
   | Repr_nil p off : repr_fields [] p off
   | Repr_cons v vs p off q z :
       ptr_off p off q ->
@@ -230,7 +230,7 @@ Definition room (st : state) (tinfo : ptr) (n : Z) : Prop :=
 (** The roots [rs] hold words representing [vs], and these representations
     depend only on heap bytes outside the nursery and [thread_info]: they
     survive everything the generated code writes and the collector's run. *)
-Definition roots_ok cenv fds genv (st : state) tinfo (rs : list ptr) (vs : list cps.val) : Prop :=
+Definition roots_ok cenv fds genv (st : state) tinfo (rs : list ptr) (vs : list term.val) : Prop :=
   exists zs,
     Forall2 (reads_word st) rs zs /\
     forall st2, heap_bytes_agree_except st st2 (not_object st tinfo) ->
@@ -396,7 +396,7 @@ Definition tag_ok (cenv : ctor_env) (t : ctor_tag) : Prop :=
     arities match, projections are in range, and every allocation chunk
     (the words the limit check at the head of a run of constructors asks
     for) is below 2^64 bytes, as the check compares in 64-bit arithmetic. *)
-Inductive body_ok (cenv : ctor_env) : cps.exp -> Prop :=
+Inductive body_ok (cenv : ctor_env) : term.exp -> Prop :=
 | BO_constr x t ys e :
     tag_ok cenv t -> arity_of cenv t = N.of_nat (length ys) ->
     8 * Z.of_N (chunk_words (Econstr x t ys e)) < 2 ^ 64 ->
@@ -417,7 +417,7 @@ Inductive fundefs_ok (cenv : ctor_env) : fundefs -> Prop :=
 
 (** Two distinct constructors of one inductive with the same ordinal are one
     nullary and one not: the pipeline numbers the two classes separately
-    ([LambdaBoxLocal_to_LambdaANF.convert_cnstrs]), and the emitted [case]
+    ([LambdaBox_to_LambdaANF.common.convert_cnstrs]), and the emitted [case]
     tests the low bit before switching on the ordinal.  (The Wasm backend's
     [cenv_restricted] also forbids a boxed constructor from sharing its
     ordinal with a nullary one, which the pipeline's numbering violates for
@@ -431,7 +431,7 @@ Definition cenv_ok (cenv : ctor_env) : Prop :=
 (** The program [Efun fds main] is closed with unique bindings (what the
     LambdaANF pipeline guarantees before code generation), and satisfies the
     restrictions above. *)
-Definition llvm_restricted (cenv : ctor_env) (fds : fundefs) (main : cps.exp) : Prop :=
+Definition llvm_restricted (cenv : ctor_env) (fds : fundefs) (main : term.exp) : Prop :=
   fundefs_ok cenv fds /\ body_ok cenv main /\
   (~ exists x, occurs_free (Efun fds main) x) /\
   unique_bindings (Efun fds main) /\
@@ -447,7 +447,7 @@ Definition LambdaANF_to_LLVM_correct_statement : Prop :=
   forall (cenv : ctor_env) (pfs : prims) prim_of
          (heap_inv : state -> ptr -> Prop)
          (gc : list dvalue -> MCFGtop (exc + dvalue)) (make_tinfo : MCFGtop dvalue)
-         (fds : fundefs) (main : cps.exp) (v : cps.val) (n : nat),
+         (fds : fundefs) (main : term.exp) (v : term.val) (n : nat),
     runtime_correct cenv fds heap_inv gc make_tinfo ->
     llvm_restricted cenv fds main ->
     bstep_e pfs cenv (M.empty _) (Efun fds main) v n ->

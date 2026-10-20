@@ -4,21 +4,22 @@ CCOMPILER := $(shell { command -v clang-11 || command -v clang; } 2>/dev/null)
 
 ifeq '$(CERTIROCQ_CONFIG)' 'local'
   ifeq ($(shell which cygpath 2>/dev/null),)
-  OCAMLPATH := $(shell pwd)/../../cplugin/:$(OCAMLPATH)
+  OCAMLPATH := $(shell pwd)/../../plugins/cplugin/:$(OCAMLPATH)
   else
-  OCAMLPATH := $(shell cygpath -m `pwd`)/../../cplugin/;$(OCAMLPATH)
+  OCAMLPATH := $(shell cygpath -m `pwd`)/../../plugins/cplugin/;$(OCAMLPATH)
   endif
   export OCAMLPATH
 
   COQOPTS = -Q ../../theories/Codegen CertiRocq.Codegen -Q ../../libraries CertiRocq.Libraries \
-	-Q ../../theories/LambdaANF CertiRocq.LambdaANF -Q ../../theories/LambdaBoxLocal CertiRocq.LambdaBoxLocal \
+	-Q ../../theories/LambdaANF CertiRocq.LambdaANF \
+	-Q ../../theories/LambdaBox_to_LambdaANF CertiRocq.LambdaBox_to_LambdaANF \
+	-Q ../../theories/CodegenWasm CertiRocq.CodegenWasm \
 	-Q ../../theories/Compiler CertiRocq.Compiler -Q ../../theories/common CertiRocq.Common \
 	-Q ../../theories/Glue CertiRocq.Glue \
-	-Q ../../theories/LambdaBoxMut CertiRocq.LambdaBoxMut \
-	-Q ../../plugin CertiRocq.Plugin \
-	-I ../../plugin \
-	-Q ../../cplugin CertiRocq.VanillaPlugin \
-	-I ../../cplugin \
+	-Q ../../plugins/plugin CertiRocq.Plugin \
+	-I ../../plugins/plugin \
+	-Q ../../plugins/cplugin CertiRocq.VanillaPlugin \
+	-I ../../plugins/cplugin \
 	-Q . CertiRocq.CertiRocqCheck \
 	-I .
   TESTCOQOPTS = $(COQOPTS)
@@ -52,7 +53,7 @@ test: test.vo
 test.vo: test.v
 	ulimit -Ss 65500 && coqc ${TESTCOQOPTS} test.v
 
-clean: 
+clean: Makefile.certirocqchk
 	make -f Makefile.certirocqchk clean
 	rm -f *.cm* *.o *.vo
 

@@ -6,7 +6,7 @@
 From Stdlib Require Import ZArith NArith List Lia String Program Morphisms Classical_Prop.
 From ITree Require Import ITree Eq.Eqit Interp.InterpFacts Interp.RecursionFacts.
 From ExtLib Require Import Structures.Monads.
-From CertiRocq.LambdaANF Require Import cps cps_util eval identifiers Ensembles_util set_util.
+From CertiRocq.LambdaANF Require Import term term_util eval identifiers Ensembles_util set_util.
 From CertiRocq.Common Require Import AstCommon.
 From CertiRocq.CodegenLLVM Require Import LambdaANF_to_LLVM Flatten
      LambdaANF_to_LLVM_statement LLVM_interp_lemmas LLVM_call_lemmas LLVM_convert
@@ -123,7 +123,7 @@ Proof. intros Hd Hf. eapply disj_elim; [exact Hd|apply Bound_Econstr1|exact Hf].
 (** ** The translation only reads the SSA environment at the variables of
     the expression *)
 
-Definition FB (e : cps.exp) (y : var) : Prop := occurs_free e y \/ bound_var e y.
+Definition FB (e : term.exp) (y : var) : Prop := occurs_free e y \/ bound_var e y.
 
 Lemma store_fields_ext fs env env' vp i ys :
   (forall y, In y ys -> env y = env' y) -> store_fields fs env vp i ys = store_fields fs env' vp i ys.
@@ -162,7 +162,7 @@ Proof.
   apply IH; [cbn in L; lia|]. destruct H as [[<-|Hin]|H]; auto. rewrite Pos.eqb_refl in E. discriminate.
 Qed.
 
-Lemma arm_loop_ext (tr1 tr2 : cps.exp -> positive -> list (LLVMAst.block typ) * positive) go ga arms fr :
+Lemma arm_loop_ext (tr1 tr2 : term.exp -> positive -> list (LLVMAst.block typ) * positive) go ga arms fr :
   (forall c e fr, In (c, e) arms -> tr1 e fr = tr2 e fr) ->
   arm_loop_d tr1 go ga arms fr = arm_loop_d tr2 go ga arms fr.
 Proof.
@@ -364,7 +364,7 @@ Proof. rewrite ccode_cons. reflexivity. Qed.
 (* ------------------------------------------------------------------ *)
 (** ** Restricting the SSA environment to the free variables *)
 
-Definition restrict (env : nenv) (e : cps.exp) : nenv :=
+Definition restrict (env : nenv) (e : term.exp) : nenv :=
   fun y => if in_dec Pos.eq_dec y (PS.elements (exp_fv e)) then env y else Raw (Zpos y).
 
 Lemma restrict_fv env e y : occurs_free e y -> restrict env e y = env y.
@@ -1124,7 +1124,7 @@ Proof.
   injection Hb as <-. apply H, E.
 Qed.
 
-Lemma split_rel (P : cps.val -> Z -> Prop) (R1 : var -> cps.val -> Prop) roots (wsd : list dvalue) :
+Lemma split_rel (P : term.val -> Z -> Prop) (R1 : var -> term.val -> Prop) roots (wsd : list dvalue) :
   Forall2 (fun r w => exists v z, w = I64 z /\ R1 r v /\ P v z) roots wsd ->
   exists vs zs, wsd = map I64 zs /\ Forall2 R1 roots vs /\ Forall2 P vs zs.
 Proof.
@@ -1133,7 +1133,7 @@ Proof.
   - exists (v :: vs), (z :: zs). split; [reflexivity|]. split; constructor; auto.
 Qed.
 
-Lemma join_rel (P : cps.val -> Z -> Prop) (R1 : var -> cps.val -> Prop) roots vs zs :
+Lemma join_rel (P : term.val -> Z -> Prop) (R1 : var -> term.val -> Prop) roots vs zs :
   Forall2 R1 roots vs -> Forall2 P vs zs ->
   Forall2 (fun r w => exists v z, w = I64 z /\ R1 r v /\ P v z) roots (map I64 zs).
 Proof.
@@ -1154,7 +1154,7 @@ Section Constr.
   Variable G : global_env.
   Variable ctx : CallE ~> itree (CallE +' MCFGEtop).
   Variable tinfo : ptr.
-  Variable main : cps.exp.
+  Variable main : term.exp.
 
   Notation go := (ord_of cenv).
   Notation ga := (arity_of cenv).

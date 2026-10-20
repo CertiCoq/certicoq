@@ -14,17 +14,17 @@
       injective and disjoint from [ntmp] and ANF names (Sect. 2/3);
     - the same structure for [mk_fun] / [compile_prog] (Sect. 4).
 
-    None of the results needs [body_ok]: they hold for every [cps.exp]. *)
+    None of the results needs [body_ok]: they hold for every [term.exp]. *)
 
 From Stdlib Require Import ZArith NArith List Lia Bool.
 From Stdlib Require String.
 Import String.
-From CertiRocq.LambdaANF Require Import cps identifiers set_util.
+From CertiRocq.LambdaANF Require Import term identifiers set_util.
 From CertiRocq.Common Require Import AstCommon.
 From CertiRocq.CodegenLLVM Require Import LambdaANF_to_LLVM.
 From Vellvm Require Import Syntax.LLVMAst.
 Import ListNotations.
-Local Notation exp := cps.exp.
+Local Notation exp := term.exp.
 
 (* ------------------------------------------------------------------ *)
 (** ** 0. Auxiliary syntactic notions *)

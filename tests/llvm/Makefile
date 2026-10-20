@@ -5,8 +5,8 @@
 #   make theories/Makefile libraries/Makefile
 #   make -C libraries -j24
 #   make -C theories -j24 Extraction/extraction.vo
-#   make runtime plugin/Makefile && bash ./make_plugin.sh plugin
-# The plugin is used in place (OCAMLPATH=../../plugin), not installed.
+#   make runtime plugins/plugin/Makefile && bash ./make_plugin.sh plugin
+# The plugin is used in place (OCAMLPATH=../../plugins/plugin), not installed.
 #
 #   make            plain, final-gc and asan modes on every test
 #   make all-modes  additionally O2 and valgrind (skipped if not installed)

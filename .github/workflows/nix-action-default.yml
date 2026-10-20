@@ -10,8 +10,9 @@ jobs:
         github.sha }}\" >> $GITHUB_ENV\nelse\n  echo \"target_commit=${{ github.event.pull_request.head.sha
         }}\" >> $GITHUB_ENV\nfi\n"
     - name: Git checkout
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
+        allow-unsafe-pr-checkout: true
         fetch-depth: 0
         ref: ${{ env.target_commit }}
     - name: Determine which commit to test
@@ -24,8 +25,9 @@ jobs:
         }}\" >> $GITHUB_ENV\n  else\n    echo \"tested_commit=$merge_commit\" >> $GITHUB_ENV\n\
         \  fi\nfi\n"
     - name: Git checkout
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
+        allow-unsafe-pr-checkout: true
         fetch-depth: 0
         ref: ${{ env.tested_commit }}
     - name: Cachix install
@@ -53,31 +55,31 @@ jobs:
         status=fetched\" >> $GITHUB_OUTPUT\nfi\n"
     - if: steps.stepCheck.outputs.status != 'fetched'
       name: 'Building/fetching previous CI target: coq'
-      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle
+      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle 
         "default" --argstr job "coq"
     - if: steps.stepCheck.outputs.status != 'fetched'
       name: 'Building/fetching previous CI target: wasmcert'
-      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle
+      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle 
         "default" --argstr job "wasmcert"
     - if: steps.stepCheck.outputs.status != 'fetched'
       name: 'Building/fetching previous CI target: coqprime'
-      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle
+      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle 
         "default" --argstr job "coqprime"
     - if: steps.stepCheck.outputs.status != 'fetched'
       name: 'Building/fetching previous CI target: compcert'
-      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle
+      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle 
         "default" --argstr job "compcert"
     - if: steps.stepCheck.outputs.status != 'fetched'
       name: 'Building/fetching previous CI target: ExtLib'
-      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle
+      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle 
         "default" --argstr job "ExtLib"
     - if: steps.stepCheck.outputs.status != 'fetched'
       name: 'Building/fetching previous CI target: metarocq'
-      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle
+      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle 
         "default" --argstr job "metarocq"
     - if: steps.stepCheck.outputs.status != 'fetched'
       name: Building/fetching current CI target
-      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle
+      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle 
         "default" --argstr job "CertiRocq"
   coq:
     needs:
@@ -89,8 +91,9 @@ jobs:
         github.sha }}\" >> $GITHUB_ENV\nelse\n  echo \"target_commit=${{ github.event.pull_request.head.sha
         }}\" >> $GITHUB_ENV\nfi\n"
     - name: Git checkout
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
+        allow-unsafe-pr-checkout: true
         fetch-depth: 0
         ref: ${{ env.target_commit }}
     - name: Determine which commit to test
@@ -103,8 +106,9 @@ jobs:
         }}\" >> $GITHUB_ENV\n  else\n    echo \"tested_commit=$merge_commit\" >> $GITHUB_ENV\n\
         \  fi\nfi\n"
     - name: Git checkout
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
+        allow-unsafe-pr-checkout: true
         fetch-depth: 0
         ref: ${{ env.tested_commit }}
     - name: Cachix install
@@ -132,11 +136,11 @@ jobs:
         status=fetched\" >> $GITHUB_OUTPUT\nfi\n"
     - if: steps.stepCheck.outputs.status != 'fetched'
       name: 'Building/fetching previous CI target: rocq-core'
-      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle
+      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle 
         "default" --argstr job "rocq-core"
     - if: steps.stepCheck.outputs.status != 'fetched'
       name: Building/fetching current CI target
-      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle
+      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle 
         "default" --argstr job "coq"
   metarocq:
     needs:
@@ -148,8 +152,9 @@ jobs:
         github.sha }}\" >> $GITHUB_ENV\nelse\n  echo \"target_commit=${{ github.event.pull_request.head.sha
         }}\" >> $GITHUB_ENV\nfi\n"
     - name: Git checkout
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
+        allow-unsafe-pr-checkout: true
         fetch-depth: 0
         ref: ${{ env.target_commit }}
     - name: Determine which commit to test
@@ -162,8 +167,9 @@ jobs:
         }}\" >> $GITHUB_ENV\n  else\n    echo \"tested_commit=$merge_commit\" >> $GITHUB_ENV\n\
         \  fi\nfi\n"
     - name: Git checkout
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
+        allow-unsafe-pr-checkout: true
         fetch-depth: 0
         ref: ${{ env.tested_commit }}
     - name: Cachix install
@@ -191,35 +197,35 @@ jobs:
         status=fetched\" >> $GITHUB_OUTPUT\nfi\n"
     - if: steps.stepCheck.outputs.status != 'fetched'
       name: 'Building/fetching previous CI target: coq'
-      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle
+      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle 
         "default" --argstr job "coq"
     - if: steps.stepCheck.outputs.status != 'fetched'
       name: 'Building/fetching previous CI target: equations'
-      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle
+      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle 
         "default" --argstr job "equations"
     - if: steps.stepCheck.outputs.status != 'fetched'
       name: 'Building/fetching previous CI target: ExtLib'
-      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle
+      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle 
         "default" --argstr job "ExtLib"
     - if: steps.stepCheck.outputs.status != 'fetched'
       name: 'Building/fetching previous CI target: metarocq-safechecker-plugin'
-      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle
+      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle 
         "default" --argstr job "metarocq-safechecker-plugin"
     - if: steps.stepCheck.outputs.status != 'fetched'
       name: 'Building/fetching previous CI target: metarocq-erasure-plugin'
-      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle
+      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle 
         "default" --argstr job "metarocq-erasure-plugin"
     - if: steps.stepCheck.outputs.status != 'fetched'
       name: 'Building/fetching previous CI target: metarocq-translations'
-      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle
+      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle 
         "default" --argstr job "metarocq-translations"
     - if: steps.stepCheck.outputs.status != 'fetched'
       name: 'Building/fetching previous CI target: metarocq-quotation'
-      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle
+      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle 
         "default" --argstr job "metarocq-quotation"
     - if: steps.stepCheck.outputs.status != 'fetched'
       name: Building/fetching current CI target
-      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle
+      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle 
         "default" --argstr job "metarocq"
   rocq-core:
     needs: []
@@ -230,8 +236,9 @@ jobs:
         github.sha }}\" >> $GITHUB_ENV\nelse\n  echo \"target_commit=${{ github.event.pull_request.head.sha
         }}\" >> $GITHUB_ENV\nfi\n"
     - name: Git checkout
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
+        allow-unsafe-pr-checkout: true
         fetch-depth: 0
         ref: ${{ env.target_commit }}
     - name: Determine which commit to test
@@ -244,8 +251,9 @@ jobs:
         }}\" >> $GITHUB_ENV\n  else\n    echo \"tested_commit=$merge_commit\" >> $GITHUB_ENV\n\
         \  fi\nfi\n"
     - name: Git checkout
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
+        allow-unsafe-pr-checkout: true
         fetch-depth: 0
         ref: ${{ env.tested_commit }}
     - name: Cachix install
@@ -273,7 +281,7 @@ jobs:
         status=fetched\" >> $GITHUB_OUTPUT\nfi\n"
     - if: steps.stepCheck.outputs.status != 'fetched'
       name: Building/fetching current CI target
-      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle
+      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle 
         "default" --argstr job "rocq-core"
 name: Nix CI for bundle default
 on:
@@ -289,4 +297,4 @@ on:
     - reopened
   push:
     branches:
-    - master
+    - main

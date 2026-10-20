@@ -24,17 +24,17 @@
       compcert.job = false;
       compcert.override.version = "3.17";
       wasmcert.job = false;
-      wasmcert.override.version = "v2.2.0";
+      wasmcert.override.version = "v2.2.1";
       ExtLib.job = false;
       ExtLib.override.version = "0.13.0";
       metarocq.job = true;
-      metarocq.override.version = "v1.5.1-9.1";
+      metarocq.override.version = "9.1";
     }; rocqPackages = {
       rocq-core.override.version = "9.1";
     };
   };
 
-  bundles."default".push-branches = ["master"];
+  bundles."default".push-branches = ["main"];
 
   ## Cachix caches to use in CI
   ## Below we list some standard ones

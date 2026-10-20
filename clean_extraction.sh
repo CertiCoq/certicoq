@@ -1,16 +1,22 @@
 #!/usr/bin/env bash
 
 PLUGIN=$1
+if [ ! -d "${PLUGIN}" ]
+then
+    PLUGIN="plugins/${PLUGIN}"
+fi
+
+PLUGIN_NAME=$(basename "${PLUGIN}")
 EPATH=
 
 echo "Plugin: " ${PLUGIN}
 
-if [ "${PLUGIN}" == "plugin" ]
+if [ "${PLUGIN_NAME}" == "plugin" ]
 then 
     echo "Building optimized ML plugin"
     EPATH="theories/Extraction"
 else
-    if [ "${PLUGIN}" == "cplugin" ]
+    if [ "${PLUGIN_NAME}" == "cplugin" ]
     then
         echo "Building vanila ML plugin"
         EPATH="theories/ExtractionVanilla"
@@ -46,8 +52,6 @@ cd ../..
 cd ${PLUGIN}/extraction
 mv aST.ml AST.ml
 mv aST.mli AST.mli
-# Work around a compiler bug in module name resolution
-sed -f ../extraction.sed compile0.ml > compile0.ml.tmp && mv -f compile0.ml.tmp compile0.ml
 # We compile with -rectypes, so these definitions are badly interepreted
 sed -e "s/type int = int/type nonrec int = int/" integers.mli > integers.mli.tmp && mv -f integers.mli.tmp integers.mli
 sed -e "s/type int = int/type nonrec int = int/" integers.ml > integers.ml.tmp && mv -f integers.ml.tmp integers.ml

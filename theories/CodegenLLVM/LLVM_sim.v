@@ -23,7 +23,7 @@ From Stdlib Require Relations.Operators_Properties.
 From ITree Require Import ITree Eq.Eqit Interp.InterpFacts Interp.RecursionFacts.
 From ExtLib Require Import Structures.Monads.
 
-From CertiRocq.LambdaANF Require Import cps cps_util eval identifiers.
+From CertiRocq.LambdaANF Require Import term term_util eval identifiers.
 From CertiRocq.Common Require Import AstCommon.
 From CertiRocq.CodegenLLVM Require Import LambdaANF_to_LLVM Flatten
      LambdaANF_to_LLVM_statement LLVM_interp_lemmas LLVM_call_lemmas LLVM_convert
@@ -317,13 +317,13 @@ Section Simulation.
 
   (** A representation that survives everything the generated code may later
       do to the heap. *)
-  Definition stable_repr (st : state) (v : cps.val) (z : Z) : Prop :=
+  Definition stable_repr (st : state) (v : term.val) (z : Z) : Prop :=
     forall st2, heap_bytes_agree_except st st2 (not_object st tinfo) ->
       repr_val cenv fds G st2 v z.
 
   (** The runtime-level invariant: heap invariant, well-formed [thread_info],
       well-formed memory, and a shadow stack whose roots [rs] represent [vs]. *)
-  Definition INV (st : state) (fp : ptr) (rs : list ptr) (vs : list cps.val) : Prop :=
+  Definition INV (st : state) (fp : ptr) (rs : list ptr) (vs : list term.val) : Prop :=
     heap_inv st tinfo /\ tinfo_ok st tinfo /\ mem_ok st /\ nursery_tinfo_disjoint st tinfo /\
     field st tinfo off_fp fp /\ shadow_stack st fp rs /\ stack_ok st fp rs /\
     roots_ok cenv fds G st tinfo rs vs.
@@ -331,7 +331,7 @@ Section Simulation.
   (** Source environment vs. Vellvm locals, on the variables [S].  Top-level
       functions are globals; every other variable is held, under its current
       SSA name [env x], as a word that stably represents its value. *)
-  Definition env_rel (S : var -> Prop) (rho : M.t cps.val) (env : nenv)
+  Definition env_rel (S : var -> Prop) (rho : M.t term.val) (env : nenv)
              (sf : stack_frame) (st : state) : Prop :=
     forall x, S x ->
       exists v, M.get x rho = Some v /\
@@ -1432,7 +1432,7 @@ Section Simulation.
       may free heap blocks, which may then be reused by an [alloca]), and the
       caller's stack kept ([keeps_stack]). *)
   Definition sim_result (st : state) (stk : stack) (fp : ptr) (rs : list ptr)
-             (vs : list cps.val) (v : cps.val)
+             (vs : list term.val) (v : term.val)
              (t : MCFGbot (Res ((block_id * block_id) + dvalue))) : Prop :=
     ends_in_oom t \/
     exists st' sf' z,
@@ -1446,7 +1446,7 @@ Section Simulation.
   (* ------------------------------------------------------------------ *)
   (** ** The call knot *)
 
-  Definition fun_def (f : var) (xs : list var) (e : cps.exp) : definition dtyp (CFG.cfg dtyp) :=
+  Definition fun_def (f : var) (xs : list var) (e : term.exp) : definition dtyp (CFG.cfg dtyp) :=
     conv_def (flat_def (mk_fun go ga prim_of fs (Anon (Zpos f)) xs e)).
 
   (** Calling the address of a top-level function runs its body; calling the
@@ -1496,7 +1496,7 @@ Section Simulation.
   Qed.
 
   (** The whole program, for the constructor-environment facts. *)
-  Variable main : cps.exp.
+  Variable main : term.exp.
   Hypothesis Hprog : llvm_restricted cenv fds main.
 
   (** [body_ok] is closed under subterms, so every proper subterm of the
@@ -1550,7 +1550,7 @@ Section Simulation.
       [sim_stmt rho' e' v -> sim_stmt rho e v] (the premise being the
       induction hypothesis for the continuation), so they can be proved in
       separate files. *)
-  Definition sim_stmt (rho : eval.env) (e : cps.exp) (v : cps.val) : Prop :=
+  Definition sim_stmt (rho : eval.env) (e : term.exp) (v : term.val) : Prop :=
     forall env chunk fresh blks f' (B : list (LLVMAst.block dtyp)) va c st sf stk fp rs vs,
       body_ok cenv e ->
       subterm_or_eq e (Efun fds main) ->

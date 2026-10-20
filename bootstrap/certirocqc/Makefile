@@ -23,30 +23,32 @@ CCOMPCOMPILEROPTS = $(CCOMPILEROPTS)
 
 ifeq '$(CERTIROCQ_CONFIG)' 'local'
   ifeq ($(shell which cygpath 2>/dev/null),)
-  OCAMLPATH := $(shell pwd)/../../cplugin/:$(OCAMLPATH)
+  OCAMLPATH := $(shell pwd)/../../plugins/cplugin/:$(OCAMLPATH)
   else
-  OCAMLPATH := $(shell cygpath -m `pwd`)/../../cplugin/;$(OCAMLPATH)
+  OCAMLPATH := $(shell cygpath -m `pwd`)/../../plugins/cplugin/;$(OCAMLPATH)
   endif
   export OCAMLPATH
 
   COQOPTS = -Q ../../theories/Codegen CertiRocq.Codegen -Q ../../libraries CertiRocq.Libraries \
-	-Q ../../theories/LambdaANF CertiRocq.LambdaANF -Q ../../theories/LambdaBoxLocal CertiRocq.LambdaBoxLocal \
-	-Q ../../theories/CodegenWasm CertiRocq.CodegenWasm\
+	-Q ../../theories/LambdaANF CertiRocq.LambdaANF \
+	-Q ../../theories/LambdaBox_to_LambdaANF CertiRocq.LambdaBox_to_LambdaANF \
+	-Q ../../theories/CodegenWasm CertiRocq.CodegenWasm \
 	-Q ../../theories/Compiler CertiRocq.Compiler -Q ../../theories/common CertiRocq.Common \
 	-Q ../../theories/Glue CertiRocq.Glue \
-	-Q ../../theories/LambdaBoxMut CertiRocq.LambdaBoxMut \
-	-Q ../../plugin CertiRocq.Plugin \
-	-I ../../plugin \
-	-Q ../../cplugin CertiRocq.VanillaPlugin \
-	-I ../../cplugin \
+	-Q ../../plugins/plugin CertiRocq.Plugin \
+	-I ../../plugins/plugin \
+	-Q ../../plugins/cplugin CertiRocq.VanillaPlugin \
+	-I ../../plugins/cplugin \
 	-Q theories CertiRocq.CertiRocqC \
 	-I .
 
   TESTCOQOPTS = $(COQOPTS)
+  CERTIROCQ_PIPELINE_DEPS = ../../theories/Compiler/pipeline.vo
 else
  ifeq '$(CERTIROCQ_CONFIG)' 'global'
   COQOPTS = -I . -Q theories CertiRocq.CertiRocqC
   TESTCOQOPTS = 
+  CERTIROCQ_PIPELINE_DEPS =
  else
   $(error "Must first set CERTIROCQ_CONFIG by running ./configure.sh")
  endif
@@ -94,12 +96,12 @@ clean: Makefile.certirocqc
 	make -f Makefile.certirocqc clean
 	rm -f *.cm* *.o *.vo theories/*.vo
 
-theories/CertiRocqC.vo: theories/CertiRocqC.v
+theories/CertiRocqC.vo: theories/CertiRocqC.v $(CERTIROCQ_PIPELINE_DEPS)
 	coqc $(COQOPTS) $<
 
 theories/compile.v: theories/CertiRocqC.vo
 
-theories/compile.vo CertiRocq.CertiRocqC.compile.certirocqc.c &: theories/compile.v
+theories/compile.vo CertiRocq.CertiRocqC.compile.certirocqc.c &: theories/compile.v theories/CertiRocqC.vo $(CERTIROCQ_PIPELINE_DEPS)
 	coqc $(COQOPTS) $<
 
 g_certirocqc.ml: g_certirocqc.mlg certirocqc.cmx certirocqc_plugin_wrapper.cmx

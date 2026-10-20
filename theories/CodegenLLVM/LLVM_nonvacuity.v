@@ -45,7 +45,7 @@
 From Stdlib Require Import ZArith NArith List Lia String Program Morphisms.
 From ITree Require Import ITree Eq.Eqit Interp.InterpFacts Events.State Events.StateFacts.
 From ExtLib Require Import Structures.Monads.
-From CertiRocq.LambdaANF Require Import cps cps_util eval identifiers.
+From CertiRocq.LambdaANF Require Import term term_util eval identifiers.
 From MetaRocq.Common Require Import BasicAst.
 From CertiRocq.CodegenLLVM Require Import LambdaANF_to_LLVM_statement LLVM_interp_lemmas LLVM_call_lemmas
      LLVM_exp_lemmas LLVM_mem_lemmas LLVM_instr_lemmas LLVM_toplevel_link.
@@ -675,8 +675,8 @@ Qed.
 Definition ex_cenv : ctor_env :=
   M.set 1%positive (Build_ctor_ty_info nAnon nAnon 1%positive 0%N 0%N) (M.empty _).
 
-Definition ex_main : cps.exp := Econstr 1%positive 1%positive [] (Ehalt 1%positive).
-Definition ex_prog : cps.exp := Efun Fnil ex_main.
+Definition ex_main : term.exp := Econstr 1%positive 1%positive [] (Ehalt 1%positive).
+Definition ex_prog : term.exp := Efun Fnil ex_main.
 
 Lemma ex_get t i : M.get t ex_cenv = Some i -> t = 1%positive /\ i = Build_ctor_ty_info nAnon nAnon 1%positive 0%N 0%N.
 Proof.

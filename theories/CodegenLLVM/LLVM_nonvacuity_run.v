@@ -29,7 +29,7 @@
 From Stdlib Require Import ZArith NArith List Lia String Program Morphisms.
 From ITree Require Import ITree Eq.Eqit Interp.InterpFacts Events.State Events.StateFacts.
 From ExtLib Require Import Structures.Monads.
-From CertiRocq.LambdaANF Require Import cps cps_util eval identifiers.
+From CertiRocq.LambdaANF Require Import term term_util eval identifiers.
 From CertiRocq.CodegenLLVM Require Import LambdaANF_to_LLVM_statement LLVM_interp_lemmas LLVM_call_lemmas
      LLVM_exp_lemmas LLVM_mem_lemmas LLVM_instr_lemmas LLVM_toplevel_link LLVM_nonvacuity LLVM_convert LambdaANF_to_LLVM.
 From Vellvm Require Import

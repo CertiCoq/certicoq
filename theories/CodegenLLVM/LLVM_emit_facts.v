@@ -8,7 +8,7 @@
       instruction helpers. *)
 
 From Stdlib Require Import ZArith NArith List Lia String SetoidList Bool.
-From CertiRocq.LambdaANF Require Import cps cps_util identifiers set_util Ensembles_util.
+From CertiRocq.LambdaANF Require Import term term_util identifiers set_util Ensembles_util.
 From CertiRocq.Common Require Import AstCommon.
 From CertiRocq.CodegenLLVM Require Import LambdaANF_to_LLVM LLVM_convert LLVM_emit_syntax.
 From Vellvm Require Import Syntax Semantics.DynamicValues.

@@ -17,7 +17,7 @@ From Stdlib Require Import ZArith NArith List Lia String Program Morphisms.
 From ITree Require Import ITree Eq.Eqit.
 From ExtLib Require Import Structures.Monads.
 
-From CertiRocq.LambdaANF Require Import cps cps_util eval identifiers.
+From CertiRocq.LambdaANF Require Import term term_util eval identifiers.
 From CertiRocq.CodegenLLVM Require Import LambdaANF_to_LLVM Flatten
      LambdaANF_to_LLVM_statement LLVM_exp_lemmas LLVM_mem_lemmas LLVM_sim.
 From CertiRocq.CodegenLLVM Require LLVM_toplevel_link
@@ -91,7 +91,7 @@ Section SimExp.
       ctx _ (Call dt (Ptr p) args) ≈ lift_top (gc args).
   Hypothesis G_funs : forall f, In f (fun_ids fds) -> exists fp, RM.find (Anon (Zpos f)) G = Some (Ptr fp).
   Hypothesis G_gc : exists gp, RM.find (Name "garbage_collect") G = Some (Ptr gp).
-  Variable main : cps.exp.
+  Variable main : term.exp.
   Hypothesis Hprog : llvm_restricted cenv fds main.
 
   Theorem sim_exp : forall rho e v n,

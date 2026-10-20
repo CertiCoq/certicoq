@@ -90,9 +90,9 @@ if [ $# -eq 0 ]; then
 fi
 
 rocq() { # (OCaml 4.14 runs on the C stack: big corpus terms need ulimit -s)
-  (cd "$HERE" && { ulimit -s unlimited 2>/dev/null || ulimit -s 1048576 2>/dev/null; true; } && OCAMLPATH="$ROOT/plugin${OCAMLPATH:+:$OCAMLPATH}" \
+  (cd "$HERE" && { ulimit -s unlimited 2>/dev/null || ulimit -s 1048576 2>/dev/null; true; } && OCAMLPATH="$ROOT/plugins/plugin${OCAMLPATH:+:$OCAMLPATH}" \
      opam exec --switch="$SWITCH" -- rocq c \
-       -Q "$ROOT/plugin" CertiRocq.Plugin -Q "$HERE" CertiRocq.LLVMTests \
+       -Q "$ROOT/plugins/plugin" CertiRocq.Plugin -Q "$HERE" CertiRocq.LLVMTests \
        -Q "$B/corpus" CertiRocq.LLVMCorpus "$@")
 }
 

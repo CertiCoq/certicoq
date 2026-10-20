@@ -32,6 +32,11 @@ jobs:
             startGroup "fix permission issues"
               sudo chown -R 1000:1000 .
             endGroup
+            startGroup "Pin the MetaRocq 9.1 development snapshot"
+              # The image's 1.5.1 release lacks EImplementLazyForce.
+              opam pin add --yes --no-action \
+                'git+https://github.com/MetaRocq/metarocq.git#c8cd46054518193103c3bb33aa6e15c7f489e72c'
+            endGroup
           before_script: |
             startGroup "Install more dependencies"
               # TODO: install node with apt once a more recent version is available for debian. We need at least version 22.

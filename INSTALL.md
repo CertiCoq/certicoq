@@ -5,7 +5,8 @@ These instructions build CertiRocq from source inside a dedicated
 
 ## Prerequisites
 
-- opam 2.1 or later ([installation instructions](https://opam.ocaml.org/doc/Install.html))
+- opam 2.1 or later, initialized with `opam init`
+  ([installation instructions](https://opam.ocaml.org/doc/Install.html))
 - git, GNU make, Python 3 and a C compiler (clang). On macOS, these come with
   the Xcode Command Line Tools (`xcode-select --install`).
 
@@ -48,7 +49,7 @@ $ opam install --deps-only -y .
 ```
 
 This builds Rocq 9.1, MetaRocq, CompCert, WasmCert and the other dependencies
-from source, so it can take an hour or more. If opam reports missing system
+from source, which takes about half an hour on a recent laptop. If opam reports missing system
 packages (for example GMP), install them with your system package manager and
 run the command again.
 
@@ -66,15 +67,18 @@ parallel; adjust the number to your machine.
 
 ## Running the tests
 
-The regression suites under `tests/` use the plugin from your build
-directory, so there is no need to install anything first:
+The regression suites live under `tests/`. Run them all, or one suite at a
+time:
 
 ```console
 $ make -C tests all
+$ make -C tests programs
 ```
 
-The Wasm tests under `tests/wasm/` additionally require `node` (the CI uses
-Node.js 22) and `wabt`.
+All suites except `tests/ffi` use the plugin from your build directory.
+`tests/ffi` uses the installed plugin, so it needs `make install` first (see
+below). The Wasm tests under `tests/wasm/` additionally require `node` (the CI
+uses Node.js 22) and `wabt`.
 
 ## Installing CertiRocq (optional)
 

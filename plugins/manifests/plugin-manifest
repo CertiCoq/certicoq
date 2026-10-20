@@ -321,7 +321,7 @@ Datatypes_properties :: plugin
 List_extra :: plugin
 Binary_format_printer :: plugin
 LambdaANF_to_Wasm_restrictions :: plugin
-LambdaANF_to_Wasm_primitives :: plugin
+LambdaANF_to_Wasm_primints :: plugin
 LambdaANF_to_Wasm :: plugin
 Toplevel1 :: plugin
 Glue_utils

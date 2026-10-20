@@ -258,7 +258,7 @@ Datatypes_properties
 List_extra
 Binary_format_printer
 LambdaANF_to_Wasm_restrictions
-LambdaANF_to_Wasm_primitives
+LambdaANF_to_Wasm_primints
 LambdaANF_to_Wasm
 Toplevel1
 Glue_utils

@@ -29,6 +29,7 @@ jobs:
           custom_image: ${{ matrix.image }}
           opam_file: ${{ matrix.opam_file }}
           before_install: | # comment back in if MetaRocq commit changes
+            ulimit -s unlimited
             startGroup "fix permission issues"
               sudo chown -R 1000:1000 .
             endGroup
@@ -59,7 +60,6 @@ jobs:
               opam list
             endGroup
             startGroup "Run tests"
-              ulimit -s unlimited
               make -C ~/repo plugin && make -C ~/repo/tests all
             endGroup
             startGroup "Test bootstrapped plugins"

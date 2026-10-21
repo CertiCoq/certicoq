@@ -319,6 +319,8 @@ extraction/memory.ml
 extraction/memory.mli
 extraction/memtype.ml
 extraction/memtype.mli
+extraction/merge_dup_funs.ml
+extraction/merge_dup_funs.mli
 extraction/metarocq_pipeline.ml
 extraction/metarocq_pipeline.mli
 extraction/monad0.ml

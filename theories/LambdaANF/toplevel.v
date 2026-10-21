@@ -3,7 +3,8 @@ Require Import Common.
 From CertiRocq Require Import
      LambdaANF.term LambdaANF.term_util LambdaANF.state LambdaANF.eval LambdaANF.shrink_cps
      LambdaANF.inline LambdaANF.uncurry_proto LambdaANF.closure_conversion
-     LambdaANF.closure_conversion LambdaANF.hoisting LambdaANF.dead_param_elim LambdaANF.lambda_lifting.
+     LambdaANF.closure_conversion LambdaANF.hoisting LambdaANF.dead_param_elim LambdaANF.lambda_lifting
+     LambdaANF.merge_dup_funs.
 From CertiRocq.LambdaBox_to_LambdaANF Require Import common anf_convert_env.
 From CertiRocq.LambdaBox_to_LambdaANF Require anf cps.
 (* From CertiRocq.Codegen Require Import LambdaANF_to_Clight. *)
@@ -166,138 +167,6 @@ Section IDENT.
 
 
   Definition id_trans : anf_trans := fun e c => (Ret e, c).
-
-  (** Merge alpha-equivalent closed top-level functions, after hoisting. Erasure implements
-      every [□] as its own copy of [fix reccall _ := reccall]; this keeps a single copy.
-      TODO: prove [merge_dup_funs] correct. *)
-  Section MergeDupFuns.
-
-    Local Open Scope bool_scope.
-
-    Definition rn (σ : M.t var) (x : var) : var :=
-      match M.get x σ with Some y => y | None => x end.
-
-    Fixpoint rename_exp (σ : M.t var) (e : exp) {struct e} : exp :=
-      match e with
-      | Econstr x c ys k => Econstr x c (List.map (rn σ) ys) (rename_exp σ k)
-      | Ecase x bs => Ecase (rn σ x) (List.map (fun b => (fst b, rename_exp σ (snd b))) bs)
-      | Eproj x c n y k => Eproj x c n (rn σ y) (rename_exp σ k)
-      | Eletapp x f t ys k => Eletapp x (rn σ f) t (List.map (rn σ) ys) (rename_exp σ k)
-      | Efun fds k => Efun (rename_fds σ fds) (rename_exp σ k)
-      | Eapp f t ys => Eapp (rn σ f) t (List.map (rn σ) ys)
-      | Eprim_val x p k => Eprim_val x p (rename_exp σ k)
-      | Eprim x p ys k => Eprim x p (List.map (rn σ) ys) (rename_exp σ k)
-      | Ehalt x => Ehalt (rn σ x)
-      end
-    with rename_fds (σ : M.t var) (fds : fundefs) {struct fds} : fundefs :=
-      match fds with
-      | Fcons f t xs e fds' => Fcons f t xs (rename_exp σ e) (rename_fds σ fds')
-      | Fnil => Fnil
-      end.
-
-    (* Alpha-equivalence up to a bijection: [σ] maps left binders to right ones, [ρ] back. *)
-    Definition var_eqb (σ ρ : M.t var) (x y : var) : bool :=
-      match M.get x σ, M.get y ρ with
-      | Some y', Some x' => Pos.eqb y' y && Pos.eqb x' x
-      | None, None => Pos.eqb x y
-      | _, _ => false
-      end.
-
-    Fixpoint vars_eqb (σ ρ : M.t var) (xs ys : list var) : bool :=
-      match xs, ys with
-      | nil, nil => true
-      | x :: xs, y :: ys => var_eqb σ ρ x y && vars_eqb σ ρ xs ys
-      | _, _ => false
-      end.
-
-    Fixpoint exp_alpha_eqb (σ ρ : M.t var) (e1 e2 : exp) {struct e1} : bool :=
-      match e1, e2 with
-      | Econstr x1 c1 ys1 k1, Econstr x2 c2 ys2 k2 =>
-        Pos.eqb c1 c2 && vars_eqb σ ρ ys1 ys2 &&
-        exp_alpha_eqb (M.set x1 x2 σ) (M.set x2 x1 ρ) k1 k2
-      | Ecase x1 bs1, Ecase x2 bs2 =>
-        var_eqb σ ρ x1 x2 &&
-        (fix go (bs1 bs2 : list (ctor_tag * exp)) : bool :=
-           match bs1, bs2 with
-           | nil, nil => true
-           | (c1, b1) :: bs1, (c2, b2) :: bs2 =>
-             Pos.eqb c1 c2 && exp_alpha_eqb σ ρ b1 b2 && go bs1 bs2
-           | _, _ => false
-           end) bs1 bs2
-      | Eproj x1 c1 n1 y1 k1, Eproj x2 c2 n2 y2 k2 =>
-        Pos.eqb c1 c2 && N.eqb n1 n2 && var_eqb σ ρ y1 y2 &&
-        exp_alpha_eqb (M.set x1 x2 σ) (M.set x2 x1 ρ) k1 k2
-      | Eletapp x1 f1 t1 ys1 k1, Eletapp x2 f2 t2 ys2 k2 =>
-        var_eqb σ ρ f1 f2 && Pos.eqb t1 t2 && vars_eqb σ ρ ys1 ys2 &&
-        exp_alpha_eqb (M.set x1 x2 σ) (M.set x2 x1 ρ) k1 k2
-      | Eapp f1 t1 ys1, Eapp f2 t2 ys2 =>
-        var_eqb σ ρ f1 f2 && Pos.eqb t1 t2 && vars_eqb σ ρ ys1 ys2
-      | Eprim x1 p1 ys1 k1, Eprim x2 p2 ys2 k2 =>
-        Pos.eqb p1 p2 && vars_eqb σ ρ ys1 ys2 &&
-        exp_alpha_eqb (M.set x1 x2 σ) (M.set x2 x1 ρ) k1 k2
-      | Ehalt x1, Ehalt x2 => var_eqb σ ρ x1 x2
-      | _, _ => false (* [Efun] and [Eprim_val] are conservatively treated as distinct *)
-      end.
-
-    Definition fundef : Type := var * fun_tag * list var * exp.
-
-    Fixpoint fds_to_list (fds : fundefs) : list fundef :=
-      match fds with
-      | Fcons f t xs e fds' => (f, t, xs, e) :: fds_to_list fds'
-      | Fnil => nil
-      end.
-
-    Fixpoint list_to_fds (l : list fundef) : fundefs :=
-      match l with
-      | (f, t, xs, e) :: l' => Fcons f t xs e (list_to_fds l')
-      | nil => Fnil
-      end.
-
-    Fixpoint bind_vars (σ : M.t var) (xs ys : list var) : M.t var :=
-      match xs, ys with
-      | x :: xs, y :: ys => bind_vars (M.set x y σ) xs ys
-      | _, _ => σ
-      end.
-
-    (* [f1] can be replaced by [f2] if they have the same tag and arity, and the body of
-       [f1], with [f1] renamed to [f2], is alpha-equivalent to the body of [f2]. *)
-    Definition fundef_eqb (d1 d2 : fundef) : bool :=
-      let '(f1, t1, xs1, e1) := d1 in
-      let '(f2, t2, xs2, e2) := d2 in
-      Pos.eqb t1 t2 && Nat.eqb (length xs1) (length xs2) &&
-      exp_alpha_eqb (bind_vars (M.empty _) xs1 xs2) (bind_vars (M.empty _) xs2 xs1)
-                    (rename_exp (M.set f1 f2 (M.empty _)) e1) e2.
-
-    Definition fundef_name (d : fundef) : var := let '(f, _, _, _) := d in f.
-
-    Fixpoint find_dup (d : fundef) (reps : list fundef) : option var :=
-      match reps with
-      | nil => None
-      | r :: reps => if fundef_eqb d r then Some (fundef_name r) else find_dup d reps
-      end.
-
-    (* Keep the first function of each equivalence class and map the others to it. *)
-    Fixpoint merge_list (l reps : list fundef) (σ : M.t var) : list fundef * M.t var :=
-      match l with
-      | nil => (List.rev reps, σ)
-      | d :: l => match find_dup d reps with
-                  | Some g => merge_list l reps (M.set (fundef_name d) g σ)
-                  | None => merge_list l (d :: reps) σ
-                  end
-      end.
-
-    (* Iterate, since merging functions can make the functions that use them identical. *)
-    Fixpoint merge_dup_funs (fuel : nat) (e : exp) : exp :=
-      match fuel, e with
-      | S fuel, Efun fds k =>
-        let l := fds_to_list fds in
-        let '(reps, σ) := merge_list l nil (M.empty _) in
-        if Nat.eqb (length reps) (length l) then e
-        else merge_dup_funs fuel (Efun (rename_fds σ (list_to_fds reps)) (rename_exp σ k))
-      | _, _ => e
-      end.
-
-  End MergeDupFuns.
 
   Definition merge_dup_funs_trans : anf_trans :=
     fun e c => (Ret (merge_dup_funs 10 e), c).

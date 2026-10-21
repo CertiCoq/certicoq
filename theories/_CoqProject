@@ -90,6 +90,7 @@ LambdaANF/lambda_lifting_correct.v
 LambdaANF/lambda_lifting_corresp.v
 LambdaANF/inline.v
 LambdaANF/inline_correct.v
+LambdaANF/merge_dup_funs.v
 LambdaANF/toplevel.v
 LambdaANF/toplevel_theorems.v
 

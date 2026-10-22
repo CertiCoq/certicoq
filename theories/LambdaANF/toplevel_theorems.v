@@ -569,6 +569,11 @@ Section Compose.
 
   Opaque uncurry_top.
 
+  (* TODO: prove. Merging alpha-equivalent closed top-level functions. *)
+  Lemma merge_dup_funs_correct :
+    correct cenv merge_dup_funs_trans.
+  Admitted.
+
   Lemma correct_id_trans :
     correct cenv id_trans.
   Proof.
@@ -649,6 +654,10 @@ Section Compose.
     eapply correct_time.
     unfold inline_lifted. now eapply inline_correct_cor.
     now eapply correct_id_trans.
+
+    eapply correct_compose.
+
+    eapply correct_time. now eapply merge_dup_funs_correct.
 
     now eapply correct_id_trans.
   Qed.
